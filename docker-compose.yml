@@ -1,0 +1,93 @@
+# Local Airflow (LocalExecutor — no Celery/Redis; this project doesn't need
+# distributed task execution, see docs/ARCHITECTURE_DECISIONS.md ADR-004).
+#
+# Named distinctly (`name:` below, plus a non-default webserver port) so it
+# doesn't collide with any other Airflow stack already running on this
+# machine on the default port 8080.
+name: medicare-claims-airflow
+
+x-airflow-common: &airflow-common
+  build:
+    context: ./orchestration/airflow
+  environment: &airflow-common-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres/airflow
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "true"
+    AIRFLOW_DATA_DIR: /opt/airflow/data
+    GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
+    BQ_RAW_DATASET: ${BQ_RAW_DATASET:-medicare_raw}
+    GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/secrets/gcp-service-account.json
+  volumes:
+    - ./orchestration/airflow/dags:/opt/airflow/dags
+    - ./orchestration/airflow/logs:/opt/airflow/logs
+    - ./orchestration/airflow/plugins:/opt/airflow/plugins
+    - ./data:/opt/airflow/data
+    - ./secrets:/opt/airflow/secrets:ro
+  user: "${AIRFLOW_UID:-50000}:0"
+  depends_on: &airflow-common-depends-on
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *airflow-common
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate
+        airflow users create \
+          --username admin --password admin \
+          --firstname Admin --lastname User \
+          --role Admin --email admin@example.com
+    environment:
+      <<: *airflow-common-env
+      _AIRFLOW_DB_MIGRATE: "true"
+
+  airflow-webserver:
+    <<: *airflow-common
+    command: webserver
+    ports:
+      - "${AIRFLOW_WEBSERVER_PORT:-8081}:8080"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    command: scheduler
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    depends_on:
+      <<: *airflow-common-depends-on
+      airflow-init:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  postgres-db-volume:

@@ -12,6 +12,8 @@ __pycache__/
 *-key.json
 service-account*.json
 *.pem
+secrets/*
+!secrets/.gitkeep
 streamlit_app/.streamlit/secrets.toml
 
 # Raw data (public + synthetic, but never committed in full — see docs/GOVERNANCE.md)

@@ -415,10 +415,11 @@ committed); `.env.example` documents keys with placeholder values only.
 # 19. Local Development
 
 1. `cp .env.example .env` and fill in local/sandbox credentials.
-2. `docker compose up airflow-init && docker compose up` — local Airflow at
-   `localhost:8080`.
-3. `make spark-test` — run PySpark unit tests locally (no Databricks needed
-   for this).
+2. `make airflow-up` — local Airflow at `localhost:8081` (`admin`/`admin`;
+   pinned off the default 8080 so it doesn't collide with another local
+   Airflow stack). `make airflow-logs` tails it; `make airflow-down` stops it.
+3. `make ingest-test` / `make spark-test` — run ingestion and PySpark unit
+   tests locally (no Docker/Databricks needed for either).
 4. `make dbt-build` — run `dbt build` against the BigQuery sandbox project
    (or a dbt DuckDB target for fully local iteration, if configured).
 5. `make streamlit-run` — `streamlit run streamlit_app/app.py` with

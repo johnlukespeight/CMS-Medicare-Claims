@@ -89,4 +89,24 @@ full milestone list and current progress.
       and — notably — that `MEDREIMB_IP`/`MEDREIMB_OP` are not guaranteed
       non-negative (claim adjustments exist in the real data)
 
-Next: **Milestone 1 — Airflow Ingestion** (see spec §28).
+**Milestone 1 — Airflow Ingestion: mostly done, one step pending your GCP credentials.**
+
+- [x] Local Airflow via Docker Compose (`make airflow-up`) — webserver at
+      [localhost:8081](http://localhost:8081) (`admin`/`admin`), pinned to a
+      non-default port/project name so it doesn't collide with any other
+      local Airflow stack
+- [x] `dag_ingest_beneficiary_raw`: `validate_raw_csv` → `land_raw_file` →
+      `load_to_bigquery_task`, with the validation/manifest logic factored
+      into `orchestration/airflow/dags/lib/beneficiary_ingest.py` and
+      unit-tested (`make ingest-test`)
+- [x] Ran end to end against the real 116,352-row file: validation and
+      landing (checksum manifest) both succeed; the BigQuery load task fails
+      cleanly with an actionable message since no GCP project is configured
+      yet
+- [ ] **Needs a GCP sandbox project** — add `GCP_PROJECT_ID` and
+      `GOOGLE_APPLICATION_CREDENTIALS` (service-account JSON dropped in
+      `secrets/`, gitignored) to `.env`, then re-trigger the DAG to complete
+      the `medicare_raw.beneficiary_summary` load
+
+Next: finish Milestone 1's BigQuery load once GCP credentials are available,
+then **Milestone 2 — PySpark Bronze/Silver** (see spec §28).

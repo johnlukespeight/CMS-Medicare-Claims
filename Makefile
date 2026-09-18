@@ -1,4 +1,4 @@
-.PHONY: setup sample-data profile spark-test dbt-build streamlit-run airflow-up airflow-down clean
+.PHONY: setup sample-data profile ingest-test spark-test dbt-build streamlit-run airflow-up airflow-down airflow-logs clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -17,6 +17,11 @@ profile: ## Execute the data profiling notebook against the full raw file.
 	$(VENV)/bin/jupyter nbconvert --to notebook --execute --inplace \
 		notebooks/00_data_profiling.ipynb \
 		--ExecutePreprocessor.kernel_name=python3
+
+# --- Milestone 1 : Airflow Ingestion --------------------------------------
+
+ingest-test: ## Unit-test the ingestion DAG's validation/manifest logic (no Airflow needed).
+	$(VENV)/bin/pytest orchestration/airflow/tests -v
 
 # --- Later milestones (stubs until their milestone lands) ----------------
 
@@ -41,19 +46,14 @@ streamlit-run: ## Milestone 7: run the Streamlit exploration app locally.
 		echo "streamlit-run: Milestone 7 (Streamlit Exploration App) not yet implemented — see docs/IMPLEMENTATION_SPEC.md §28"; \
 	fi
 
-airflow-up: ## Milestone 1: start local Airflow via Docker Compose.
-	@if [ -f docker-compose.yml ]; then \
-		docker compose up; \
-	else \
-		echo "airflow-up: Milestone 1 (Airflow Ingestion) not yet implemented — see docs/IMPLEMENTATION_SPEC.md §28"; \
-	fi
+airflow-up: ## Start local Airflow via Docker Compose (webserver at localhost:8081).
+	docker compose up -d --build
 
 airflow-down: ## Stop local Airflow.
-	@if [ -f docker-compose.yml ]; then \
-		docker compose down; \
-	else \
-		echo "airflow-down: Milestone 1 (Airflow Ingestion) not yet implemented — see docs/IMPLEMENTATION_SPEC.md §28"; \
-	fi
+	docker compose down
+
+airflow-logs: ## Tail local Airflow scheduler/webserver logs.
+	docker compose logs -f airflow-scheduler airflow-webserver
 
 clean: ## Remove local venv and Python caches.
 	rm -rf $(VENV)

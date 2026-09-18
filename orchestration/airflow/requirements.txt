@@ -1,0 +1,5 @@
+# Extra Python packages installed into the Airflow image on top of the base
+# apache/airflow image. Keep this minimal — Airflow's own dependency set is
+# already large and version-sensitive.
+pandas>=2.2
+google-cloud-bigquery>=3.25
