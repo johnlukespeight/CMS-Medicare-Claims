@@ -1,0 +1,37 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# Environment / secrets
+.env
+*-key.json
+service-account*.json
+*.pem
+streamlit_app/.streamlit/secrets.toml
+
+# Raw data (public + synthetic, but never committed in full — see docs/GOVERNANCE.md)
+data/raw/*
+!data/raw/.gitkeep
+
+# Airflow local runtime
+orchestration/airflow/logs/
+orchestration/airflow/plugins/
+orchestration/airflow/airflow.db
+
+# dbt
+dbt/**/target/
+dbt/**/dbt_packages/
+dbt/**/logs/
+
+# Spark
+spark_jobs/**/spark-warehouse/
+spark_jobs/**/derby.log
+spark_jobs/**/metastore_db/
+
+# OS
+.DS_Store

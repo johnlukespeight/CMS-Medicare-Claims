@@ -1,0 +1,11 @@
+# Local dev/profiling tooling shared across milestones.
+# Per-component runtime deps (spark_jobs, dbt, streamlit_app) get their own
+# requirements files as those milestones are built — this file is for the
+# tooling used to build and maintain the repo itself.
+pandas>=2.2
+jupyter>=1.0
+nbformat>=5.10
+nbconvert>=7.16
+black>=24.0
+ruff>=0.6
+pytest>=8.0
