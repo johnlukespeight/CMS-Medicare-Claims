@@ -418,8 +418,11 @@ committed); `.env.example` documents keys with placeholder values only.
 2. `make airflow-up` — local Airflow at `localhost:8081` (`admin`/`admin`;
    pinned off the default 8080 so it doesn't collide with another local
    Airflow stack). `make airflow-logs` tails it; `make airflow-down` stops it.
-3. `make ingest-test` / `make spark-test` — run ingestion and PySpark unit
-   tests locally (no Docker/Databricks needed for either).
+3. `make ingest-test` — ingestion validation unit tests (no Docker needed).
+   `make setup-spark && make spark-test` / `make spark-run` — PySpark unit
+   tests and the bronze/silver job, in their own venv (`.venv-spark`,
+   Python 3.13 — PySpark doesn't yet support the newer default `python3`
+   on this machine) with Java 8/11/17 on `JAVA_HOME`.
 4. `make dbt-build` — run `dbt build` against the BigQuery sandbox project
    (or a dbt DuckDB target for fully local iteration, if configured).
 5. `make streamlit-run` — `streamlit run streamlit_app/app.py` with

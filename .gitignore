@@ -1,5 +1,6 @@
 # Python
 .venv/
+.venv-spark/
 venv/
 __pycache__/
 *.pyc
@@ -34,6 +35,12 @@ dbt/**/logs/
 spark_jobs/**/spark-warehouse/
 spark_jobs/**/derby.log
 spark_jobs/**/metastore_db/
+derby.log
+metastore_db/
+
+# Local Delta lakehouse output (Milestone 2 — regenerate with the spark job;
+# Milestone 3 ports the same transforms to real Unity Catalog tables)
+data/lakehouse/
 
 # OS
 .DS_Store

@@ -1,7 +1,13 @@
-.PHONY: setup sample-data profile ingest-test spark-test dbt-build streamlit-run airflow-up airflow-down airflow-logs clean
+.PHONY: setup setup-spark sample-data profile ingest-test spark-test spark-run dbt-build streamlit-run airflow-up airflow-down airflow-logs clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
+
+# PySpark needs Java 8/11/17 and (as of this writing) Python <=3.13 — kept
+# in a separate venv/JDK from the main tooling above, which uses whatever
+# `python3` resolves to. `brew install openjdk@17` if this path doesn't exist.
+SPARK_VENV := .venv-spark
+JAVA_HOME := $(shell brew --prefix openjdk@17 2>/dev/null)/libexec/openjdk.jdk/Contents/Home
 
 # --- Milestone 0 : Repository Foundation ---------------------------------
 
@@ -23,14 +29,20 @@ profile: ## Execute the data profiling notebook against the full raw file.
 ingest-test: ## Unit-test the ingestion DAG's validation/manifest logic (no Airflow needed).
 	$(VENV)/bin/pytest orchestration/airflow/tests -v
 
-# --- Later milestones (stubs until their milestone lands) ----------------
+# --- Milestone 2 : PySpark Bronze/Silver ----------------------------------
 
-spark-test: ## Milestone 2: PySpark unit tests.
-	@if [ -d spark_jobs/tests ]; then \
-		$(VENV)/bin/pytest spark_jobs/tests; \
-	else \
-		echo "spark-test: Milestone 2 (PySpark Bronze/Silver) not yet implemented — see docs/IMPLEMENTATION_SPEC.md §28"; \
-	fi
+setup-spark: ## Create the dedicated PySpark venv (Python 3.13, separate from $(VENV)).
+	python3.13 -m venv $(SPARK_VENV)
+	$(SPARK_VENV)/bin/pip install --upgrade pip -q
+	$(SPARK_VENV)/bin/pip install -r spark_jobs/requirements.txt -q
+
+spark-test: ## Unit-test the bronze/silver transform logic.
+	JAVA_HOME=$(JAVA_HOME) $(SPARK_VENV)/bin/pytest spark_jobs/tests -v
+
+spark-run: ## Run the bronze/silver job locally (defaults to the fixture sample).
+	JAVA_HOME=$(JAVA_HOME) $(SPARK_VENV)/bin/python spark_jobs/jobs/beneficiary_bronze_silver.py
+
+# --- Later milestones (stubs until their milestone lands) ----------------
 
 dbt-build: ## Milestone 4: dbt build against BigQuery.
 	@if [ -d dbt/medicare_claims ]; then \
@@ -55,6 +67,6 @@ airflow-down: ## Stop local Airflow.
 airflow-logs: ## Tail local Airflow scheduler/webserver logs.
 	docker compose logs -f airflow-scheduler airflow-webserver
 
-clean: ## Remove local venv and Python caches.
-	rm -rf $(VENV)
+clean: ## Remove local venvs and Python caches.
+	rm -rf $(VENV) $(SPARK_VENV)
 	find . -type d -name __pycache__ -exec rm -rf {} +

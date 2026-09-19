@@ -1,0 +1,6 @@
+# PySpark needs a Python <=3.13 runtime as of this writing — use a dedicated
+# venv (.venv-spark, see Makefile) if your default `python3` resolves to a
+# newer version.
+pyspark>=4.0
+delta-spark>=4.0
+pytest>=8.0

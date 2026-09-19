@@ -58,6 +58,17 @@ make setup          # create .venv, install dev tooling
 cp .env.example .env  # fill in cloud credentials as later milestones need them
 ```
 
+PySpark work (`spark_jobs/`) needs its own venv — as of this writing PySpark
+requires Python <=3.13 and Java 8/11/17, which may not match your default
+`python3`:
+
+```bash
+brew install openjdk@17   # if you don't already have a Java 8/11/17
+make setup-spark          # creates .venv-spark on python3.13
+make spark-test           # unit tests
+make spark-run            # runs the bronze/silver job against the fixture sample
+```
+
 The raw file is already in `data/raw/` (gitignored). To regenerate the
 committed fixture sample used by tests and local dev:
 
@@ -135,4 +146,20 @@ if it's already running).
       confirm the full-refresh load is idempotent — row count stayed at
       116,352 both runs, no duplication.
 
-Next: **Milestone 2 — PySpark Bronze/Silver** (see spec §28).
+**Milestone 2 — PySpark Bronze/Silver: done.**
+
+- [x] `spark_jobs/transforms/beneficiary_transforms.py` — pure, testable
+      bronze (type casting only) and silver (decoded chronic-condition
+      flags, `age_2008`/`age_band`, `is_deceased`, SSA state-code lookup
+      verified against the official CMS DE-SynPUF codebook, `chronic_condition_count`)
+      transforms; 11 unit tests (`make spark-test`), including one asserting
+      exact hand-checked values for a real beneficiary from the fixture file
+- [x] `spark_jobs/jobs/beneficiary_bronze_silver.py` — runnable job, writes
+      local Delta tables (`make spark-run`); verified against both the
+      342-row fixture and the full 116,352-row raw file (bronze/silver row
+      counts match exactly, no dedup loss)
+- [x] Negative reimbursement values (§8's profiling finding) confirmed
+      preserved unchanged through the transform, not clipped
+
+Next: **Milestone 3 — Databricks Unity Catalog** (see spec §28) — ports
+these same transform functions to a real Databricks job.
