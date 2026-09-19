@@ -71,10 +71,37 @@ To re-run the data profiling notebook against the full raw file:
 make profile
 ```
 
-Other `make` targets (`spark-test`, `dbt-build`, `streamlit-run`,
-`airflow-up`) are stubbed until their milestone lands — see
+Other `make` targets (`spark-test`, `dbt-build`, `streamlit-run`) are
+stubbed until their milestone lands — see
 [`docs/IMPLEMENTATION_SPEC.md` §28](docs/IMPLEMENTATION_SPEC.md) for the
 full milestone list and current progress.
+
+### GCP sandbox setup (one-time, for the BigQuery path)
+
+No billing account needed — BigQuery's free Sandbox mode (10GB storage /
+1TB queries per month) covers this project easily:
+
+```bash
+gcloud projects create <your-project-id> --name="Medicare Claims Analytics"
+gcloud services enable bigquery.googleapis.com --project=<your-project-id>
+
+gcloud iam service-accounts create medicare-airflow \
+  --project=<your-project-id> --display-name="Medicare Airflow Ingestion"
+
+for ROLE in roles/bigquery.dataEditor roles/bigquery.jobUser; do
+  gcloud projects add-iam-policy-binding <your-project-id> \
+    --member="serviceAccount:medicare-airflow@<your-project-id>.iam.gserviceaccount.com" \
+    --role="$ROLE" --condition=None
+done
+
+gcloud iam service-accounts keys create secrets/gcp-service-account.json \
+  --iam-account=medicare-airflow@<your-project-id>.iam.gserviceaccount.com \
+  --project=<your-project-id>
+```
+
+Then set `GCP_PROJECT_ID=<your-project-id>` in `.env` and `make airflow-up`
+(or `docker compose up -d --force-recreate airflow-scheduler airflow-webserver`
+if it's already running).
 
 ## Status
 
@@ -89,7 +116,7 @@ full milestone list and current progress.
       and — notably — that `MEDREIMB_IP`/`MEDREIMB_OP` are not guaranteed
       non-negative (claim adjustments exist in the real data)
 
-**Milestone 1 — Airflow Ingestion: mostly done, one step pending your GCP credentials.**
+**Milestone 1 — Airflow Ingestion: done.**
 
 - [x] Local Airflow via Docker Compose (`make airflow-up`) — webserver at
       [localhost:8081](http://localhost:8081) (`admin`/`admin`), pinned to a
@@ -99,14 +126,13 @@ full milestone list and current progress.
       `load_to_bigquery_task`, with the validation/manifest logic factored
       into `orchestration/airflow/dags/lib/beneficiary_ingest.py` and
       unit-tested (`make ingest-test`)
-- [x] Ran end to end against the real 116,352-row file: validation and
-      landing (checksum manifest) both succeed; the BigQuery load task fails
-      cleanly with an actionable message since no GCP project is configured
-      yet
-- [ ] **Needs a GCP sandbox project** — add `GCP_PROJECT_ID` and
-      `GOOGLE_APPLICATION_CREDENTIALS` (service-account JSON dropped in
-      `secrets/`, gitignored) to `.env`, then re-trigger the DAG to complete
-      the `medicare_raw.beneficiary_summary` load
+- [x] GCP sandbox project `medicare-claims-de-synpuf` provisioned (no
+      billing — BigQuery free Sandbox mode), with a scoped service account
+      (`bigquery.dataEditor` + `bigquery.jobUser` only) whose key lives in
+      `secrets/` (gitignored)
+- [x] Ran end to end against the real 116,352-row file: `medicare_raw.beneficiary_summary`
+      in BigQuery holds exactly 116,352 rows. Re-triggered a second time to
+      confirm the full-refresh load is idempotent — row count stayed at
+      116,352 both runs, no duplication.
 
-Next: finish Milestone 1's BigQuery load once GCP credentials are available,
-then **Milestone 2 — PySpark Bronze/Silver** (see spec §28).
+Next: **Milestone 2 — PySpark Bronze/Silver** (see spec §28).
