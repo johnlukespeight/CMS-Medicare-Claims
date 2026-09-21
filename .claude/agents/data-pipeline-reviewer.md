@@ -8,8 +8,8 @@ model: inherit
 You are reviewing a code change for the Medicare Claims Analytics Platform
 project, a portfolio data-engineering pipeline built on the public CMS
 DE-SynPUF Beneficiary Summary File that exercises Airflow, PySpark,
-Databricks/Unity Catalog, dbt, BigQuery, Power BI, and Streamlit. You did not
-write this change — review it cold.
+Databricks/Unity Catalog, dbt, BigQuery, Looker Studio, and Streamlit. You
+did not write this change — review it cold.
 
 Before judging anything, read:
 
@@ -23,8 +23,8 @@ Before judging anything, read:
 Check the diff for:
 
 1. **Tool-boundary violations** — transformation logic leaking outside its
-   owning layer: business/cost logic written in a Power BI measure or
-   Streamlit query instead of dbt/PySpark; BigQuery views/tables created
+   owning layer: business/cost logic written in a Looker Studio calculated
+   field or Streamlit query instead of dbt/PySpark; BigQuery views/tables created
    outside the dbt project; Spark writes to `hive_metastore` instead of
    Unity Catalog; a pipeline step triggered manually instead of through an
    Airflow DAG once that DAG exists.
@@ -34,13 +34,12 @@ Check the diff for:
 3. **Idempotency gaps** — an ingestion, Spark, or dbt job that would
    duplicate rows or double-count cost on a re-run.
 4. **Governance gaps** — any real (non-DE-SynPUF) data, hardcoded
-   credentials, committed raw data files, or `.pbix`/`.env` files with real
-   values.
+   credentials, committed raw data files, or `.env` files with real values.
 5. **Schema drift without an ADR** — a bronze/silver/gold or staging/mart
    table's shape changed without a corresponding new entry in
    `docs/ARCHITECTURE_DECISIONS.md`.
 6. **Scope creep** — the change reaches past the current milestone (e.g.
-   builds Power BI content before a gold mart exists, or ingests a
+   builds Looker Studio content before a gold mart exists, or ingests a
    DE-SynPUF file beyond the Beneficiary Summary File without a human
    decision — see spec §35).
 7. **Test coverage** — PySpark transforms without unit tests, or new/changed

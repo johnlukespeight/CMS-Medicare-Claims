@@ -4,7 +4,7 @@ A data engineering portfolio project built on the public **CMS DE-SynPUF**
 2008 Beneficiary Summary File (Sample 1, 116,352 synthetic beneficiaries) to
 get real, demonstrable, interview-ready depth with: **Apache Airflow**,
 **dbt**, **PySpark**, **Databricks SQL / Unity Catalog**, **BigQuery**,
-**Power BI**, and **Streamlit**.
+**Looker Studio**, and **Streamlit**.
 
 The data is entirely synthetic and public — see [`docs/GOVERNANCE.md`](docs/GOVERNANCE.md).
 It is not real patient data.
@@ -21,7 +21,7 @@ single Airflow instance, surfaced through two BI layers:
                          └──────────────────────────┘
 Raw CSV (CMS DE-SynPUF)
         │
-        ├──► PySpark ──► Databricks Unity Catalog        ──► Power BI
+        ├──► PySpark ──► Databricks Unity Catalog        ──► Looker Studio
         │    (bronze → silver → gold, Delta)                  (executive
         │                                                       dashboard)
         └──► BigQuery raw ──► dbt (staging → marts)       ──► Streamlit
@@ -48,7 +48,7 @@ orchestration/airflow/     Airflow DAGs                          [Milestone 1, 3
 spark_jobs/                PySpark bronze/silver transforms      [Milestone 2]
 spark_jobs/databricks/     Databricks notebook/SQL + deploy script [Milestone 3]
 dbt/medicare_claims/       dbt staging/intermediate/mart models  [Milestone 4]
-dashboards/power_bi/       Power BI executive dashboard          [Milestone 6]
+dashboards/looker_studio/  Looker Studio executive dashboard (URL + build spec) [Milestone 6]
 streamlit_app/             Streamlit exploration app             [Milestone 7]
 ```
 
@@ -97,9 +97,14 @@ make dbt-docs    # generate + serve the lineage graph at localhost:8082
 into the Airflow image (`/opt/dbt-venv`) — see ADR-008 for why it's isolated
 from Airflow's own Python environment.
 
-Other `make` targets (`streamlit-run`) are stubbed until their milestone
-lands — see [`docs/IMPLEMENTATION_SPEC.md` §28](docs/IMPLEMENTATION_SPEC.md)
-for the full milestone list and current progress.
+```bash
+make streamlit-test           # unit tests (DuckDB backend, no cloud needed)
+make streamlit-run            # app at localhost:8501, STREAMLIT_BACKEND=duckdb against the fixture sample
+make streamlit-run-bigquery   # same app against the live BigQuery sandbox project
+```
+
+See [`docs/IMPLEMENTATION_SPEC.md` §28](docs/IMPLEMENTATION_SPEC.md) for
+the full milestone list and current progress.
 
 ### GCP sandbox setup (one-time, for the BigQuery path)
 
@@ -152,6 +157,27 @@ make databricks-run      # deploy, then trigger it and wait for it to finish
 `dag_spark_bronze_silver` (Airflow) only triggers/waits on the already-
 deployed job — re-run `make databricks-deploy` whenever the transform logic
 or gold SQL changes.
+
+### Looker Studio setup (one-time, for the fixed dashboard)
+
+Free, browser-based, no Windows/VM needed (see ADR-010 for why this
+replaced Power BI). There's no CLI/API for authoring a report from
+scratch, so this is a one-time manual step at
+[lookerstudio.google.com](https://lookerstudio.google.com):
+
+1. **Create** → **Report**. Add a BigQuery data source for each mart
+   (`mart_state_cost_summary`, `mart_chronic_condition_prevalence`,
+   `fct_beneficiary_annual_cost` joined to `dim_beneficiary`) — connect as
+   the same Google account already used for the GCP sandbox project above.
+2. Build the three pages exactly as specified in
+   [`dashboards/looker_studio/README.md`](dashboards/looker_studio/README.md)
+   (charts, fields, and filters for Overview / Chronic Conditions / Cost
+   Mix).
+3. **Share** → get the report's viewable link, and paste it into
+   `dashboards/looker_studio/README.md`.
+
+No cloud credentials to manage — the report authenticates as whichever
+Google account is viewing/editing it.
 
 ## Status
 
@@ -270,14 +296,14 @@ or gold SQL changes.
       tolerance=1.0)`), then reverted via `make databricks-run`
       (full-refresh) and confirmed the DAG passes again
 
-**Milestone 6 — Power BI Dashboard: deferred.**
+**Milestone 6 — Looker Studio Dashboard: in progress.**
 
-Power BI Desktop is Windows-only; this project is being built on macOS, and
-authoring/verifying a `.pbix` needs hands-on GUI work in that tool that
-can't be done or checked without access to it. Deferred rather than
-skipped — revisiting once Windows/Power BI access is available (see spec
-§28 for details). Jumped to Milestone 7 instead, which has no such
-platform blocker.
+Originally scoped around Power BI; replaced with **Looker Studio** per
+ADR-010 — free, browser-based, BigQuery-native, no Windows/VM needed
+(Power BI Desktop is Windows-only; this project is built on macOS).
+Milestone 7 was built first while this was blocked, then unblocked once the
+tool swap was decided. Build spec and report URL live in
+[`dashboards/looker_studio/README.md`](dashboards/looker_studio/README.md).
 
 **Milestone 7 — Streamlit Exploration App: done.**
 
@@ -305,5 +331,5 @@ platform blocker.
       reconciled totals exactly ($465,233,840 total cost; state-by-state
       counts matching the original profiling notebook)
 
-Next: Milestone 6 once Power BI access is available, or **Milestone 8 —
-Integrated Demo & Hardening** (see spec §28).
+Next: building out **Milestone 6 — Looker Studio Dashboard**, then
+**Milestone 8 — Integrated Demo & Hardening** (see spec §28).

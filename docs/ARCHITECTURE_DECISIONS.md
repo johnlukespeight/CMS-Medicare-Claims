@@ -4,7 +4,7 @@
 
 **Status:** Accepted
 **Context:** The tool list to practice (Airflow, dbt, PySpark, Databricks/
-Unity Catalog, BigQuery, Power BI, Streamlit) spans two competing data
+Unity Catalog, BigQuery, Looker Studio, Streamlit) spans two competing data
 platform paradigms — lakehouse and cloud warehouse — and a single pipeline
 can't exercise both meaningfully.
 **Decision:** Build two parallel processing paths off the same raw landing
@@ -56,11 +56,11 @@ built to demonstrate.
 
 ## ADR-005 — Two BI surfaces for two audiences
 
-**Status:** Accepted
-**Context:** Power BI and Streamlit serve different purposes and the task
-explicitly calls out Streamlit as a "second use case," not a Power BI
-replacement.
-**Decision:** Power BI hosts a fixed executive dashboard (enrollment,
+**Status:** Accepted; fixed-dashboard tool changed from Power BI to Looker Studio by ADR-010 — the two-surface pattern itself is unchanged
+**Context:** A fixed-reporting tool and Streamlit serve different purposes
+and the task explicitly calls out Streamlit as a "second use case," not a
+replacement for the other.
+**Decision:** Looker Studio hosts a fixed executive dashboard (enrollment,
 chronic-condition prevalence, cost mix) sourced from BigQuery gold marts.
 Streamlit hosts an ad hoc, filterable exploration app (cohort filters by
 state/age/condition) against the same marts, with a local DuckDB fallback
@@ -170,3 +170,33 @@ boundary — read-only, adds no new decode/aggregation logic, and is
 reconsidered if a future milestone needs the same per-beneficiary
 condition flags from more than one consumer (at which point a proper
 mart, e.g. a wide `dim_beneficiary_conditions`, would be worth adding).
+
+## ADR-010 — Power BI replaced with Looker Studio for the fixed dashboard
+
+**Status:** Accepted; amends ADR-005
+**Context:** Milestone 6 was originally scoped around Power BI (spec §4,
+§16 as first written). Power BI Desktop — the tool that actually authors
+`.pbix` reports — is Windows-only, and this project is built on macOS.
+There is no way to author or verify a `.pbix` report without either a
+Windows machine/VM or the browser-based Power BI Service, neither of which
+this project has self-serve access to. This was flagged and confirmed with
+the project owner before any Milestone 6 work started (see conversation
+history — not silently assumed).
+**Decision:** Replace Power BI with **Looker Studio** (formerly Google Data
+Studio) as the fixed-dashboard tool everywhere in the spec, `CLAUDE.md`,
+`AGENTS.md`, and `PRODUCT_SPEC.md`. Looker Studio is free (no license, no
+Google Cloud sales engagement — distinct from the paid enterprise Looker/
+LookML product, which was considered and rejected for the same reason Power
+BI was), fully browser-based, and connects natively to BigQuery with no
+exported/scheduled extract. `dashboards/looker_studio/README.md` replaces
+`dashboards/power_bi/medicare_overview.pbix` as the deliverable's home —
+there is no local report file to commit; the report lives entirely in
+Google's hosted service, referenced by its shared URL.
+**Consequences:** Loses Power BI Desktop's offline authoring and some of
+its more advanced modeling features (DAX measures, complex relationships);
+gains full self-serve buildability and verifiability without needing a
+Windows environment, and a live-query connection with no refresh-schedule
+concept to manage. `docs/GOVERNANCE.md` and `docs/IMPLEMENTATION_SPEC.md`
+§24 updated accordingly: no `.pbix`-with-embedded-credentials risk to guard
+against, since the report holds no local credential file at all — it
+authenticates as whichever Google account is viewing/editing it.

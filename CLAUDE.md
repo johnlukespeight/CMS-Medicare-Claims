@@ -10,7 +10,7 @@ project built on the public CMS DE-SynPUF 2008 Beneficiary Summary File
 vertical slice is:
 
 **Raw CSV landed via Airflow → PySpark bronze/silver on Databricks (Unity
-Catalog) → BigQuery raw load → dbt staging/marts → Power BI executive
+Catalog) → BigQuery raw load → dbt staging/marts → Looker Studio executive
 dashboard + Streamlit exploration app**
 
 The point of the project is depth of tool usage, not dataset breadth: one
@@ -35,8 +35,11 @@ multi-user auth, or Kubernetes — all listed as future work in §35.
 3. Airflow is the single orchestrator across tool boundaries (ingest → Spark/
    Databricks → dbt/BigQuery). No manual triggering of a step once its
    milestone has an Airflow DAG for it.
-4. Two BI surfaces, two audiences, don't collapse them: Power BI is the fixed
-   executive dashboard; Streamlit is the ad hoc/self-serve exploration app.
+4. Two BI surfaces, two audiences, don't collapse them: Looker Studio is the
+   fixed executive dashboard; Streamlit is the ad hoc/self-serve exploration
+   app. (Originally Power BI — replaced per ADR-010: Power BI Desktop is
+   Windows-only and this project is built on macOS; Looker Studio is free,
+   browser-based, and connects natively to BigQuery.)
 5. Only CMS DE-SynPUF public synthetic files may ever be ingested. Never real
    Medicare claims, PHI, or PII — in dev or prod. See `docs/GOVERNANCE.md`.
 6. Cloud resources (BigQuery, Databricks) stay within free-tier/sandbox
@@ -51,7 +54,7 @@ multi-user auth, or Kubernetes — all listed as future work in §35.
    dbt tests (`not_null`, `unique`, `accepted_values`, `relationships`) on
    every staging and mart model.
 10. Do not commit raw data files, service-account keys, Databricks tokens, or
-    `.pbix`/`.env` files containing credentials.
+    `.env` files containing credentials.
 11. Do not introduce Kafka/streaming, Kubernetes, Great Expectations/Soda, or
     a second orchestrator for this build without an explicit ADR.
 12. Stop at a milestone boundary unless asked to continue.

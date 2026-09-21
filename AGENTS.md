@@ -7,8 +7,8 @@ changes.
 
 Build a portfolio-grade Medicare data platform on the public CMS DE-SynPUF
 2008 Beneficiary Summary File that demonstrates real, orchestrated use of
-Airflow, PySpark, Databricks/Unity Catalog, dbt, BigQuery, Power BI, and
-Streamlit — in that pipeline order, not as isolated demos.
+Airflow, PySpark, Databricks/Unity Catalog, dbt, BigQuery, Looker Studio,
+and Streamlit — in that pipeline order, not as isolated demos.
 
 ## Current priority
 
@@ -32,8 +32,7 @@ BI layers all at once before the foundation (repo structure, `.gitignore`,
   real Medicare/PHI/PII data, in dev or prod.
 - Every pipeline job (ingestion, Spark, dbt) must be idempotent and safe to
   re-run.
-- Do not commit secrets, raw data files, `.pbix` files with embedded
-  credentials, or real sensitive user data.
+- Do not commit secrets, raw data files, or real sensitive user data.
 
 ## Engineering behavior
 

@@ -36,10 +36,11 @@ in dev, test, or a future "prod" demo environment.
   though CMS has already cleared it for public use — this is deliberate
   practice for real-world data-engineering hygiene, not a compliance
   requirement for this specific dataset.
-- No service-account keys, Databricks personal access tokens, BigQuery
-  credentials, or `.pbix` files with embedded connection credentials are
-  committed. Use `.env` (gitignored) and `.env.example` (committed, no real
-  values).
+- No service-account keys, Databricks personal access tokens, or BigQuery
+  credentials are committed. Use `.env` (gitignored) and `.env.example`
+  (committed, no real values). Looker Studio reports live entirely in
+  Google's hosted service (no local credential file to leak) — see
+  `docs/ARCHITECTURE_DECISIONS.md` ADR-010.
 
 ## Model improvement / analytics use
 

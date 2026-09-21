@@ -5,8 +5,8 @@
 **Stage:** Portfolio / interview-preparation build — treat milestones like production increments even though there's no external user
 **Primary language(s):** Python (PySpark, Airflow, Streamlit), SQL (dbt, BigQuery, Databricks SQL)
 **Architecture style:** Two parallel processing paths off one raw landing zone — lakehouse (Databricks/Unity Catalog) and warehouse ELT (BigQuery/dbt) — unified by a single Airflow orchestrator and two BI surfaces
-**Deployment target:** Local (Docker Compose Airflow, local Spark, DuckDB) → cloud sandbox (Databricks free/Community workspace, BigQuery sandbox project, Power BI free workspace)
-**Guiding principle:** Prefer the simplest design that gives every tool in the required list — Airflow, dbt, PySpark, Databricks/Unity Catalog, BigQuery, Power BI, Streamlit — a real, idiomatic role, over a design that makes any one of them decorative.
+**Deployment target:** Local (Docker Compose Airflow, local Spark, DuckDB) → cloud sandbox (Databricks free/Community workspace, BigQuery sandbox project, Looker Studio — free, browser-based)
+**Guiding principle:** Prefer the simplest design that gives every tool in the required list — Airflow, dbt, PySpark, Databricks/Unity Catalog, BigQuery, Looker Studio, Streamlit — a real, idiomatic role, over a design that makes any one of them decorative.
 
 ---
 
@@ -19,8 +19,8 @@ human-authored decision explicitly overrides it.
 
 1. Build milestones in order (§28). Do not start the Databricks/Spark layer
    before the Airflow ingestion DAG lands raw data; do not start dbt before
-   raw data is loaded into BigQuery; do not start Power BI/Streamlit before
-   at least one gold mart exists to point them at.
+   raw data is loaded into BigQuery; do not start Looker Studio/Streamlit
+   before at least one gold mart exists to point them at.
 2. Every schema (bronze/silver/gold Delta tables, BigQuery staging/mart
    models) is defined once, in code, and reused — never redefined ad hoc in
    a notebook, dashboard, or Streamlit query.
@@ -49,7 +49,7 @@ A self-contained data engineering portfolio project that ingests the public
 CMS DE-SynPUF 2008 Beneficiary Summary File and turns it into two governed
 analytical layers — a Databricks/Unity Catalog lakehouse and a BigQuery/dbt
 warehouse — orchestrated end to end by Airflow, and exposed through two BI
-surfaces (Power BI for fixed reporting, Streamlit for ad hoc exploration).
+surfaces (Looker Studio for fixed reporting, Streamlit for ad hoc exploration).
 It exists to give hands-on, demonstrable, interview-ready experience with
 each required tool used the way it's actually used in industry, not as a
 disconnected tutorial exercise.
@@ -57,7 +57,7 @@ disconnected tutorial exercise.
 # 2. Portfolio-Build User Story
 
 A visitor (recruiter, hiring manager, or the developer in an interview)
-opens the Streamlit app or the Power BI dashboard and sees: how many
+opens the Streamlit app or the Looker Studio dashboard and sees: how many
 Medicare beneficiaries are enrolled by state, the prevalence of each of the
 11 tracked chronic conditions, and how inpatient/outpatient/carrier
 reimbursement is distributed across beneficiaries and conditions. Behind
@@ -90,7 +90,7 @@ with tests passing in BigQuery.
 | Lakehouse governance | Databricks Unity Catalog (`medicare.bronze/silver/gold`) |
 | Warehouse | Google BigQuery (sandbox project) |
 | Warehouse transformation | dbt-core (dbt-bigquery adapter) |
-| Fixed BI dashboard | Power BI (BigQuery connector) |
+| Fixed BI dashboard | Looker Studio (native BigQuery connector) |
 | Ad hoc exploration app | Streamlit (BigQuery + local DuckDB fallback) |
 | Local dev warehouse stand-in | DuckDB (for Streamlit/dbt iteration without cloud cost) |
 
@@ -109,6 +109,9 @@ with tests passing in BigQuery.
 - **No Kubernetes:** local Docker Compose Airflow and managed
   Databricks/BigQuery sandboxes are sufficient; there's no multi-service
   app to containerize beyond Airflow itself.
+- **No Power BI:** Power BI Desktop (the tool that authors reports) is
+  Windows-only; this project is built on macOS. Looker Studio is free,
+  browser-based, and connects natively to BigQuery — see ADR-010.
 
 # 5. Repository Layout
 
@@ -178,8 +181,8 @@ CMS-Medicare-Claims/
 ├── notebooks/
 │   └── 00_data_profiling.ipynb
 ├── dashboards/
-│   └── power_bi/
-│       └── medicare_overview.pbix
+│   └── looker_studio/
+│       └── README.md             # report URL + build spec -- no local file, see ADR-010 (report lives entirely in Google's hosted service)
 └── streamlit_app/
     ├── app.py
     ├── data_access.py            # BigQuery/DuckDB query layer, see ADR-009
@@ -207,13 +210,14 @@ write to BigQuery.
 Owns all BigQuery transformation SQL from `medicare_raw` through staging,
 intermediate, and marts. Must not call out to Spark or Databricks.
 
-## `dashboards/power_bi` and `streamlit_app`
+## `dashboards/looker_studio` and `streamlit_app`
 
 Read-only consumers of gold marts (BigQuery, and for Streamlit optionally
 Databricks SQL or local DuckDB). Must not contain transformation logic that
 changes reported numbers — if a metric needs new logic, it belongs in dbt or
-the Spark silver job, not in a dashboard measure or Streamlit query, except
-for pure presentation (formatting, filtering already-modeled columns).
+the Spark silver job, not in a Looker Studio calculated field or Streamlit
+query, except for pure presentation (formatting, filtering already-modeled
+columns).
 
 # 7. Database Model
 
@@ -336,9 +340,9 @@ Stage by stage:
 4. **Reconcile** (`dag_gold_reconcile`, optional but recommended): compare
    beneficiary counts and total cost between Databricks `gold.beneficiary_cost_summary`
    and BigQuery `fct_beneficiary_annual_cost`; fail loudly if they diverge.
-5. **Serve**: Power BI refreshes against BigQuery marts on a schedule;
-   Streamlit queries BigQuery (or local DuckDB) live on each user
-   interaction.
+5. **Serve**: Looker Studio queries BigQuery marts live (direct query, no
+   separate refresh schedule to manage); Streamlit queries BigQuery (or
+   local DuckDB) live on each user interaction.
 
 # 13. Risk/Safety Routing
 
@@ -375,19 +379,25 @@ goal, which would live here if ever promoted out of "future work."
 
 # 16. Frontend Requirements
 
-## Power BI (`dashboards/power_bi/medicare_overview.pbix`)
+## Looker Studio (`dashboards/looker_studio/`, report hosted at lookerstudio.google.com — see ADR-010)
 
-Fixed executive dashboard, pages:
-- **Overview** — total beneficiaries, total 2008 Medicare-paid cost, average
-  cost per beneficiary, enrollment by state (map).
-- **Chronic Conditions** — prevalence by condition, average cost by
-  condition, condition-count distribution.
-- **Cost Mix** — IP vs. OP vs. carrier reimbursement split, cost by age
-  band.
+Fixed executive report, pages:
+- **Overview** — scorecards for total beneficiaries, total 2008
+  Medicare-paid cost, and average cost per beneficiary; a geo map of
+  enrollment by state.
+- **Chronic Conditions** — bar chart of prevalence by condition, bar chart
+  of average cost by condition, a chronic-condition-count distribution
+  chart.
+- **Cost Mix** — IP vs. OP vs. carrier reimbursement split (stacked bar or
+  pie), cost by age band (bar chart).
 
-Connects to BigQuery marts (`mart_state_cost_summary`,
-`mart_chronic_condition_prevalence`, `fct_beneficiary_annual_cost`) via the
-native BigQuery connector.
+Each page's charts connect directly to BigQuery marts
+(`mart_state_cost_summary`, `mart_chronic_condition_prevalence`,
+`fct_beneficiary_annual_cost` joined to `dim_beneficiary` for age band) via
+Looker Studio's native BigQuery connector — one data source per mart, added
+through "Add data → BigQuery," no exported/scheduled extract. There is no
+local report file to version-control; `dashboards/looker_studio/README.md`
+holds the report's shared URL and the build spec above in copyable form.
 
 ## Streamlit (`streamlit_app/app.py`)
 
@@ -450,8 +460,10 @@ committed); `.env.example` documents keys with placeholder values only.
 6. `make streamlit-run` — `streamlit run streamlit_app/app.py` with
    `STREAMLIT_BACKEND=duckdb` for zero-cost local iteration against the
    fixture sample.
-7. Power BI Desktop is opened manually and pointed at the BigQuery sandbox
-   dataset — not part of the automated `make` targets.
+7. Looker Studio is opened at lookerstudio.google.com and pointed at the
+   BigQuery sandbox project's marts — a browser step, not part of the
+   automated `make` targets (there's no local report file/CLI to drive).
+   See `dashboards/looker_studio/README.md`.
 
 # 20. Testing Strategy
 
@@ -499,10 +511,11 @@ use least-privilege IAM.
 
 # 24. Security Requirements
 
-- No secrets committed (service-account keys, Databricks tokens, `.pbix`
-  files with embedded credentials, `.env`).
+- No secrets committed (service-account keys, Databricks tokens, `.env`).
 - BigQuery and Databricks access scoped to a dedicated sandbox
-  project/workspace, not a shared or production account.
+  project/workspace, not a shared or production account. The Looker Studio
+  report authenticates to BigQuery as the signed-in Google user viewing/
+  editing it (Google's own OAuth), not via a stored credential.
 - Airflow Connections store credentials in Airflow's encrypted connection
   store, not in DAG code.
 
@@ -525,9 +538,8 @@ Streamlit app or dashboards is in scope.
 
 ## Milestone 0 — Repository Foundation
 ### Deliverables
-- Repo layout per §5; `.gitignore` excluding `data/raw/`, `.env`, credential
-  files, `.pbix` (or track `.pbix` via Git LFS if the human wants it
-  versioned — default is gitignored).
+- Repo layout per §5; `.gitignore` excluding `data/raw/`, `.env`, and
+  credential files.
 - `README.md` with project overview and the commands from §19.
 - `data/samples/` fixture (few hundred rows) generated from the source CSV.
 - `notebooks/00_data_profiling.ipynb` profiling the raw file (nulls, value
@@ -591,17 +603,14 @@ Streamlit app or dashboards is in scope.
   BigQuery=465233840.00 (diff=500.00, tolerance=1.0)`); reverting via
   `make databricks-run` restored a passing run.
 
-## Milestone 6 — Power BI Dashboard
-### Status: deferred
-Power BI Desktop (the tool that authors `.pbix` files) is Windows-only;
-this project is being built on macOS. Authoring and verifying
-`medicare_overview.pbix` needs hands-on interactive GUI work in that tool,
-which isn't something that can be done or verified without access to it.
-Deferred rather than skipped — revisit once Windows/Power BI access (VM,
-browser-based Power BI Service, or otherwise) is available. Milestone 7 was
-built first since it has no such platform blocker.
+## Milestone 6 — Looker Studio Dashboard
+Originally scoped as a Power BI dashboard; replaced per ADR-010 (Power BI
+Desktop is Windows-only, this project is built on macOS — Looker Studio is
+free, browser-based, and BigQuery-native, so it's buildable without a VM).
 ### Deliverables
-- `medicare_overview.pbix` per §16, connected to BigQuery marts.
+- A Looker Studio report (Overview / Chronic Conditions / Cost Mix pages
+  per §16) connected live to the BigQuery marts, with its shared URL and
+  build spec recorded in `dashboards/looker_studio/README.md`.
 ### Acceptance criteria
 - All three pages render against live BigQuery data with no errors; numbers
   match the equivalent dbt mart query run directly.
@@ -711,7 +720,7 @@ stage.
 Build one milestone at a time, in order, and stop at each boundary unless
 told to continue. Every number that ends up on a dashboard must trace back
 to a single, tested piece of transformation code — never to logic invented
-inside Power BI or a Streamlit query. When a tool-specific decision isn't
+inside Looker Studio or a Streamlit query. When a tool-specific decision isn't
 covered here, prefer the choice that gives that tool a real, defensible role
 in an interview conversation over the choice that's merely fastest to wire
 up.

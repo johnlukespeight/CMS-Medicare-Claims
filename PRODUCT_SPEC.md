@@ -5,7 +5,7 @@
 A self-directed data engineering portfolio project built to prepare for data
 engineering interviews by giving hands-on, demonstrable depth with a
 specific, commonly-required toolchain: Apache Airflow, dbt, PySpark,
-Databricks SQL/Unity Catalog, BigQuery, Power BI, and Streamlit. Rather than
+Databricks SQL/Unity Catalog, BigQuery, Looker Studio, and Streamlit. Rather than
 a tutorial-style demo of each tool in isolation, it's one real pipeline
 built on public CMS Medicare data where each tool plays the role it plays in
 a real DE org.
@@ -15,8 +15,11 @@ a real DE org.
 Data engineering job postings routinely list this exact combination —
 an orchestrator (Airflow), a transformation layer (dbt), a big-data
 processing engine (Spark), a lakehouse platform (Databricks/Unity Catalog),
-a cloud warehouse (BigQuery or a peer), and a BI layer (Power BI, plus
-increasingly a lightweight Python app like Streamlit for internal tools).
+a cloud warehouse (BigQuery or a peer), and a BI layer (Power BI, Tableau,
+or Looker/Looker Studio depending on the shop, plus increasingly a
+lightweight Python app like Streamlit for internal tools). This project
+uses Looker Studio specifically — free, browser-based, and BigQuery-native,
+so it's fully buildable without a Windows machine (see ADR-010).
 Interviewers want to hear about trade-offs made across these tools, not just
 that each was "used."
 
@@ -72,8 +75,8 @@ See `docs/IMPLEMENTATION_SPEC.md` §7–§8.
 
 Airflow (Docker Compose locally), Databricks (free/Community or trial
 workspace) with Unity Catalog, PySpark, Google BigQuery (sandbox project),
-dbt-core with the `dbt-bigquery` adapter, Power BI Desktop/Service, and
-Streamlit with a DuckDB local-dev fallback.
+dbt-core with the `dbt-bigquery` adapter, Looker Studio, and Streamlit with
+a DuckDB local-dev fallback.
 
 ## 12. Privacy, Security, and Data Retention
 
@@ -115,7 +118,7 @@ plan with deliverables and acceptance criteria per milestone.
 Milestone 4 (BigQuery + dbt) plus Milestone 7 (Streamlit) is the earliest
 point with a genuinely demoable artifact: a working, tested ELT pipeline
 with a live filterable app on top — useful as an interim portfolio link
-before Milestones 3/6 (Databricks, Power BI) are finished.
+before Milestones 3/6 (Databricks, Looker Studio) are finished.
 
 ## 19. Go/No-Go Decision After Build
 
