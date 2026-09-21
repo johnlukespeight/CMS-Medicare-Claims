@@ -44,8 +44,9 @@ data/raw/                  Raw CMS DE-SynPUF file (gitignored — not committed)
 data/samples/              Small committed fixture sample for tests/local dev
 notebooks/                 Data profiling
 scripts/                   One-off utilities (sample generation, notebook build)
-orchestration/airflow/     Airflow DAGs                          [Milestone 1]
+orchestration/airflow/     Airflow DAGs                          [Milestone 1, 3]
 spark_jobs/                PySpark bronze/silver transforms      [Milestone 2]
+spark_jobs/databricks/     Databricks notebook/SQL + deploy script [Milestone 3]
 dbt/medicare_claims/       dbt staging/intermediate/mart models  [Milestone 4]
 dashboards/power_bi/       Power BI executive dashboard          [Milestone 6]
 streamlit_app/             Streamlit exploration app             [Milestone 7]
@@ -82,8 +83,8 @@ To re-run the data profiling notebook against the full raw file:
 make profile
 ```
 
-Other `make` targets (`spark-test`, `dbt-build`, `streamlit-run`) are
-stubbed until their milestone lands — see
+Other `make` targets (`dbt-build`, `streamlit-run`) are stubbed until their
+milestone lands — see
 [`docs/IMPLEMENTATION_SPEC.md` §28](docs/IMPLEMENTATION_SPEC.md) for the
 full milestone list and current progress.
 
@@ -113,6 +114,31 @@ gcloud iam service-accounts keys create secrets/gcp-service-account.json \
 Then set `GCP_PROJECT_ID=<your-project-id>` in `.env` and `make airflow-up`
 (or `docker compose up -d --force-recreate airflow-scheduler airflow-webserver`
 if it's already running).
+
+### Databricks setup (one-time, for the lakehouse path)
+
+1. Sign up at `databricks.com/try-databricks` (choose **AWS** + **Express
+   Setup** for a trial, or use **Databricks Free Edition** if it's offered —
+   either way, no credit card needed and Unity Catalog is enabled by
+   default). Free Edition ships **serverless-only** compute (no classic
+   clusters) — see ADR-007 for what that changes about how the job ships.
+2. In the workspace: **Catalog** → create a catalog named `medicare` (or
+   let `deploy.py` find it — it doesn't create the catalog itself, only the
+   `bronze`/`silver`/`gold` schemas and a `raw_files` volume inside it).
+3. Generate a personal access token: avatar → **Settings** → **Developer**
+   → **Access tokens** → **Generate new token**.
+4. Set `DATABRICKS_HOST` (the workspace URL) and `DATABRICKS_TOKEN` in
+   `.env`.
+5. Deploy and run:
+
+```bash
+make databricks-deploy   # uploads transforms/notebook/gold SQL + raw CSV, creates the Job
+make databricks-run      # deploy, then trigger it and wait for it to finish
+```
+
+`dag_spark_bronze_silver` (Airflow) only triggers/waits on the already-
+deployed job — re-run `make databricks-deploy` whenever the transform logic
+or gold SQL changes.
 
 ## Status
 
@@ -161,5 +187,28 @@ if it's already running).
 - [x] Negative reimbursement values (§8's profiling finding) confirmed
       preserved unchanged through the transform, not clipped
 
-Next: **Milestone 3 — Databricks Unity Catalog** (see spec §28) — ports
-these same transform functions to a real Databricks job.
+**Milestone 3 — Databricks Unity Catalog: done.**
+
+- [x] Unity Catalog `medicare` catalog with `bronze`/`silver`/`gold` schemas
+      and a `bronze.raw_files` managed Volume holding the landed CSV
+- [x] `spark_jobs/databricks/deploy.py` — idempotently uploads the *same*
+      `beneficiary_transforms.py` from Milestone 2 (as a workspace file,
+      not duplicated), the driver notebook, and the gold SQL, then
+      creates/updates a persisted Databricks Job (`medicare_bronze_silver_gold`)
+- [x] Gold layer as Databricks SQL: `gold.beneficiary_cost_summary` (one row
+      per beneficiary) and `gold.chronic_condition_prevalence` (11
+      conditions × 52 states = 572 rows, via `UNPIVOT`)
+- [x] `dag_spark_bronze_silver` (Airflow) triggers the deployed job and
+      polls it to completion — `orchestration/airflow/dags/lib/databricks_job.py`
+      unit-tested (`make ingest-test`)
+- [x] Ran end to end against the real 116,352-row file, via both
+      `make databricks-run` and the live Airflow DAG: bronze/silver/gold row
+      counts all match Milestone 2's local run exactly, and
+      `gold.chronic_condition_prevalence`'s overall rates match
+      `notebooks/00_data_profiling.ipynb`'s original findings exactly (e.g.
+      ischemic heart disease 42.1%, diabetes 37.9%)
+- Free Edition turned out to be **serverless-only** (no classic clusters) —
+  see ADR-007 for how that changed the job's shape from what was originally
+  planned
+
+Next: **Milestone 4 — BigQuery + dbt** (see spec §28).

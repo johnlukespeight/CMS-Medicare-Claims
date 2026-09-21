@@ -1,4 +1,4 @@
-.PHONY: setup setup-spark sample-data profile ingest-test spark-test spark-run dbt-build streamlit-run airflow-up airflow-down airflow-logs clean
+.PHONY: setup setup-spark sample-data profile ingest-test spark-test spark-run databricks-deploy databricks-run dbt-build streamlit-run airflow-up airflow-down airflow-logs clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -15,6 +15,7 @@ setup: ## Create the local venv and install dev tooling.
 	python3 -m venv $(VENV)
 	$(VENV)/bin/pip install --upgrade pip -q
 	$(VENV)/bin/pip install -r requirements-dev.txt -q
+	$(VENV)/bin/pip install -r spark_jobs/databricks/requirements.txt -q
 
 sample-data: ## Regenerate the committed fixture sample from the raw CSV.
 	$(PYTHON) scripts/generate_sample.py
@@ -41,6 +42,14 @@ spark-test: ## Unit-test the bronze/silver transform logic.
 
 spark-run: ## Run the bronze/silver job locally (defaults to the fixture sample).
 	JAVA_HOME=$(JAVA_HOME) $(SPARK_VENV)/bin/python spark_jobs/jobs/beneficiary_bronze_silver.py
+
+# --- Milestone 3 : Databricks Unity Catalog -------------------------------
+
+databricks-deploy: ## Upload transforms/notebook/gold SQL + raw CSV, create/update the Databricks Job.
+	$(PYTHON) spark_jobs/databricks/deploy.py
+
+databricks-run: ## Deploy, then trigger the Databricks job and wait for it to finish.
+	$(PYTHON) spark_jobs/databricks/deploy.py --run
 
 # --- Later milestones (stubs until their milestone lands) ----------------
 

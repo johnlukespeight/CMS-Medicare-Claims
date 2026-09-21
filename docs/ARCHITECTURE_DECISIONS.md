@@ -78,3 +78,42 @@ released; the project name and dataset invite confusion with real PHI.
 CMS DE-SynPUF public synthetic files. See `docs/GOVERNANCE.md`.
 **Consequences:** Rules out ever wiring this pipeline to a real claims feed
 without a new, explicit ADR and a full governance rewrite.
+
+## ADR-007 — Databricks Free Edition (serverless-only) changes how the bronze/silver job ships
+
+**Status:** Accepted
+**Context:** Milestone 3 was originally scoped assuming a classic Databricks
+cluster (a `spark-submit`-style job, like Milestone 2's local run). The
+actual workspace provisioned (Databricks Free Edition) has **zero classic
+clusters available** — confirmed via `GET /api/2.1/clusters/list` returning
+an empty list — only serverless compute (one SQL Warehouse, and serverless
+notebook/job execution). This is a real platform constraint discovered
+during implementation, not a design preference.
+**Decision:**
+- The bronze/silver step ships as a Databricks **notebook task** run on
+  serverless compute, not a packaged `spark-submit` job. The notebook
+  (`spark_jobs/databricks/bronze_silver_notebook.py`) imports and calls the
+  *exact same* `spark_jobs/transforms/beneficiary_transforms.py` used
+  locally in Milestone 2 — uploaded as a plain workspace **file** (not a
+  notebook; format=`AUTO` with no `language` param, or Databricks silently
+  wraps it as a notebook and the import fails) alongside the driver
+  notebook, so the transform logic itself is never duplicated.
+- The raw CSV is uploaded to a Unity Catalog **Volume**
+  (`medicare.bronze.raw_files`) via the Files API rather than DBFS, keeping
+  file storage under Unity Catalog governance too, not just tables.
+- The gold layer runs as two Databricks SQL **file tasks** (also plain
+  workspace files, same AUTO-format caveat) against the one available SQL
+  Warehouse, chained as dependents of the bronze/silver task in a single
+  persisted Databricks Job (`medicare_bronze_silver_gold`), deployed
+  idempotently by `spark_jobs/databricks/deploy.py`.
+- `orchestration/airflow/dags/dag_spark_bronze_silver.py` only triggers and
+  polls that pre-deployed job by name (via the plain Databricks REST API,
+  matching `dag_ingest_beneficiary_raw.py`'s style) — it does not deploy.
+**Consequences:** No cluster-sizing/autoscaling config to reason about,
+which is one less thing to demo — a fair trade for a portfolio project, but
+worth being upfront about in an interview: this is not how a job would ship
+against a workspace with classic clusters available. Verified end to end
+against the real 116,352-row file: bronze/silver/gold row counts match
+Milestone 2's local run exactly, and `gold.chronic_condition_prevalence`'s
+overall rates match `notebooks/00_data_profiling.ipynb`'s findings exactly
+(e.g. ischemic heart disease 42.1%, diabetes 37.9%).

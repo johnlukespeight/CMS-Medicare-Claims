@@ -1,0 +1,5 @@
+# Deploy tooling for Milestone 3 (spark_jobs/databricks/deploy.py). No
+# PySpark needed here — this just calls the Databricks REST API — so it
+# runs fine in the main .venv, unlike spark_jobs/requirements.txt.
+requests>=2.31
+python-dotenv>=1.0

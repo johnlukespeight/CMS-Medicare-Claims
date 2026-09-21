@@ -141,9 +141,15 @@ CMS-Medicare-Claims/
 │           └── dag_gold_reconcile.py
 ├── spark_jobs/
 │   ├── jobs/
-│   │   └── beneficiary_bronze_silver.py
+│   │   └── beneficiary_bronze_silver.py   # local runnable job (Milestone 2)
 │   ├── transforms/
-│   │   └── beneficiary_transforms.py
+│   │   └── beneficiary_transforms.py      # shared by the local job AND the Databricks notebook
+│   ├── databricks/                        # Milestone 3 — see ADR-007
+│   │   ├── deploy.py
+│   │   ├── bronze_silver_notebook.py
+│   │   └── sql/
+│   │       ├── gold_beneficiary_cost_summary.sql
+│   │       └── gold_chronic_condition_prevalence.sql
 │   └── tests/
 │       └── test_beneficiary_transforms.py
 ├── dbt/
@@ -423,12 +429,17 @@ committed); `.env.example` documents keys with placeholder values only.
    tests and the bronze/silver job, in their own venv (`.venv-spark`,
    Python 3.13 — PySpark doesn't yet support the newer default `python3`
    on this machine) with Java 8/11/17 on `JAVA_HOME`.
-4. `make dbt-build` — run `dbt build` against the BigQuery sandbox project
+4. `make databricks-deploy` — uploads the transform module, driver notebook,
+   and gold SQL to the Databricks workspace and creates/updates the
+   `medicare_bronze_silver_gold` job; `make databricks-run` also triggers
+   and waits on it. See README's "Databricks setup" and ADR-007 (Free
+   Edition is serverless-only, which shapes how this job is built).
+5. `make dbt-build` — run `dbt build` against the BigQuery sandbox project
    (or a dbt DuckDB target for fully local iteration, if configured).
-5. `make streamlit-run` — `streamlit run streamlit_app/app.py` with
+6. `make streamlit-run` — `streamlit run streamlit_app/app.py` with
    `STREAMLIT_BACKEND=duckdb` for zero-cost local iteration against the
    fixture sample.
-6. Power BI Desktop is opened manually and pointed at the BigQuery sandbox
+7. Power BI Desktop is opened manually and pointed at the BigQuery sandbox
    dataset — not part of the automated `make` targets.
 
 # 20. Testing Strategy
@@ -536,10 +547,12 @@ Streamlit app or dashboards is in scope.
 ## Milestone 3 — Databricks Unity Catalog
 ### Deliverables
 - Unity Catalog `medicare` with `bronze`/`silver`/`gold` schemas.
-- `dag_spark_bronze_silver` submitting the Milestone 2 job to Databricks
-  against the full file; `gold.beneficiary_cost_summary` and
-  `gold.chronic_condition_prevalence` built via Databricks SQL.
-### Acceptance criteria
+- `dag_spark_bronze_silver` submitting the Milestone 2 transform logic to
+  Databricks against the full file (as a notebook task on serverless
+  compute, not a packaged `spark-submit` job — see ADR-007 for why);
+  `gold.beneficiary_cost_summary` and `gold.chronic_condition_prevalence`
+  built via Databricks SQL.
+### Acceptance criteria — met
 - DAG runs green end to end against the real 116,352-row file; gold tables
   queryable from a Databricks SQL warehouse; row/aggregate counts match the
   Milestone 2 local run on the fixture subset.

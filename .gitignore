@@ -44,3 +44,6 @@ data/lakehouse/
 
 # OS
 .DS_Store
+
+# Claude Code harness runtime state (not project config)
+.claude/scheduled_tasks.lock

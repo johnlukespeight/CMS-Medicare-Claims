@@ -18,6 +18,8 @@ x-airflow-common: &airflow-common
     GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
     BQ_RAW_DATASET: ${BQ_RAW_DATASET:-medicare_raw}
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/secrets/gcp-service-account.json
+    DATABRICKS_HOST: ${DATABRICKS_HOST:-}
+    DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:-}
   volumes:
     - ./orchestration/airflow/dags:/opt/airflow/dags
     - ./orchestration/airflow/logs:/opt/airflow/logs
