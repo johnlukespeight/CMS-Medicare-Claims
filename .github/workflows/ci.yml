@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+# Everything here runs on GitHub's free tier (unlimited minutes for public
+# repos) with no cloud credentials -- see docs/IMPLEMENTATION_SPEC.md §28
+# (Milestone 8) for why this doesn't run a real `dbt build`/Databricks job:
+# that needs live BigQuery/Databricks access, which isn't worth wiring
+# sandbox secrets into CI for. Real end-to-end verification already
+# happened manually and is documented (with exact numbers) throughout the
+# README and ADR log.
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - run: ruff check .
+      - run: black --check .
+
+  python-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            requirements-dev.txt
+            spark_jobs/databricks/requirements.txt
+            streamlit_app/requirements.txt
+      - run: |
+          pip install -r requirements-dev.txt
+          pip install -r spark_jobs/databricks/requirements.txt
+          pip install -r streamlit_app/requirements.txt
+      - name: Ingestion / Databricks-job / reconcile unit tests
+        run: pytest orchestration/airflow/tests -v
+      - name: Streamlit data-access unit tests (DuckDB backend, no cloud needed)
+        run: pytest streamlit_app/tests -v
+
+  spark-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: spark_jobs/requirements.txt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: pip install -r spark_jobs/requirements.txt
+      - run: pytest spark_jobs/tests -v
+
+  dbt-parse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: dbt/requirements.txt
+      - run: pip install -r dbt/requirements.txt
+      - name: Validate dbt project structure (refs, YAML, macros) -- no BigQuery connection needed
+        working-directory: dbt/medicare_claims
+        env:
+          GCP_PROJECT_ID: ci-placeholder-project
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/ci-fake-credentials.json
+        run: dbt parse

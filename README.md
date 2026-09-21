@@ -11,22 +11,24 @@ It is not real patient data.
 
 ## Architecture
 
-One raw landing zone feeds two parallel processing paths, orchestrated by a
-single Airflow instance, surfaced through two BI layers:
+One raw landing zone feeds two parallel processing paths — a fan-out/fan-in
+Airflow DAG (`dag_full_pipeline`, Milestone 8) runs the whole thing end to
+end and cross-checks the two paths agree before calling it done:
 
 ```
-                         ┌──────────────────────────┐
-                         │   Airflow orchestrates    │
-                         │   every arrow below        │
-                         └──────────────────────────┘
-Raw CSV (CMS DE-SynPUF)
-        │
-        ├──► PySpark ──► Databricks Unity Catalog        ──► Looker Studio
-        │    (bronze → silver → gold, Delta)                  (executive
-        │                                                       dashboard)
-        └──► BigQuery raw ──► dbt (staging → marts)       ──► Streamlit
-                                                                (ad hoc
-                                                                 exploration)
+                    ┌───────────────────────────────────┐
+                    │  dag_full_pipeline orchestrates    │
+                    │  every arrow below (`make demo`)   │
+                    └───────────────────────────────────┘
+
+                          ┌──► PySpark ──► Databricks Unity Catalog ──┐
+                          │    (bronze → silver → gold, Delta)        │
+Raw CSV (CMS DE-SynPUF) ──┤                                           ├──► dag_gold_reconcile
+   dag_ingest_            │                                           │    (counts + cost must
+   beneficiary_raw        └──► BigQuery raw ──► dbt (staging → marts)─┘     agree, or it fails loudly)
+                                                        │
+                                                        ├──► Looker Studio (executive dashboard)
+                                                        └──► Streamlit (ad hoc exploration)
 ```
 
 See [`docs/IMPLEMENTATION_SPEC.md`](docs/IMPLEMENTATION_SPEC.md) for the
@@ -178,6 +180,36 @@ scratch, so this is a one-time manual step at
 
 No cloud credentials to manage — the report authenticates as whichever
 Google account is viewing/editing it.
+
+## Full pipeline walkthrough (Milestone 8)
+
+Once the GCP and Databricks one-time setup above is done, this is the
+entire cold-clone-to-running-demo sequence:
+
+```bash
+make setup                              # local venv + dev tooling
+cp .env.example .env                    # fill in GCP_PROJECT_ID, DATABRICKS_HOST/TOKEN, etc.
+make databricks-deploy                  # one-time: uploads the Databricks job (Milestone 3)
+make dbt-seed                           # one-time: loads the ssa_state_codes reference table
+make airflow-up                         # local Airflow at localhost:8081
+make airflow-unpause-all                # required once -- a paused DAG's triggered runs never execute
+make demo                               # triggers dag_full_pipeline: ingest -> (Databricks + dbt in parallel) -> reconcile
+```
+
+Watch it run at [localhost:8081](http://localhost:8081) — `dag_full_pipeline`
+triggers and waits on each milestone's own DAG (`dag_ingest_beneficiary_raw`
+→ `dag_spark_bronze_silver` + `dag_dbt_transform` in parallel →
+`dag_gold_reconcile`), the same fan-out/fan-in shown in the architecture
+diagram above. A real run takes about 2.5 minutes end to end (Databricks'
+serverless job is the long pole).
+
+Then the two BI surfaces:
+
+```bash
+make streamlit-run-bigquery             # Streamlit against the live data (localhost:8501)
+```
+
+— and Looker Studio at whatever URL you built per the section above.
 
 ## Status
 
@@ -331,5 +363,39 @@ tool swap was decided. Build spec and report URL live in
       reconciled totals exactly ($465,233,840 total cost; state-by-state
       counts matching the original profiling notebook)
 
-Next: building out **Milestone 6 — Looker Studio Dashboard**, then
-**Milestone 8 — Integrated Demo & Hardening** (see spec §28).
+**Milestone 8 — Integrated Demo & Hardening: done.**
+
+- [x] `dag_full_pipeline` — one Airflow DAG that triggers and waits on all
+      four milestone DAGs via `TriggerDagRunOperator`, fan-out/fan-in
+      (`ingest` → `spark_bronze_silver` + `dbt_transform` in parallel →
+      `gold_reconcile`). `make demo` triggers it; `make airflow-unpause-all`
+      handles the one-time gotcha where a paused DAG's triggered runs sit
+      in `queued` forever.
+- [x] **Verified live, the real orchestrator**: triggered `dag_full_pipeline`
+      end to end — all four sub-DAGs succeeded, the two parallel branches
+      genuinely started in the same second (confirmed via task timestamps),
+      `gold_reconcile` correctly waited for the slower branch (Databricks,
+      ~2 min vs. dbt's ~30s) before running, and reconciled to the exact
+      expected totals (116,352 beneficiaries, $465,233,840) — 2.5 minutes
+      start to finish.
+- [x] README's "Full pipeline walkthrough" section ties every milestone's
+      setup into one cold-clone-to-demo sequence; architecture diagram
+      updated to show the fan-out/fan-in shape.
+- [x] CI (`.github/workflows/ci.yml`, `make ci` locally): `ruff`/`black`
+      lint, PySpark unit tests (own job — needs Java), ingestion/Databricks-
+      job/reconcile and Streamlit unit tests, and `dbt parse` (validates
+      project structure/refs/macros — deliberately not a full `dbt build`,
+      which would need live BigQuery credentials wired into CI; real
+      end-to-end verification already happened manually and is documented
+      with exact numbers throughout this README and the ADR log). All on
+      GitHub's free tier — no paid CI minutes, no cloud cost.
+- [x] `pyproject.toml` added (`ruff`/`black` config) after running lint for
+      the first time surfaced 24 real findings across the codebase — fixed,
+      not suppressed (2 unused imports, 12 unsorted-import blocks, plus
+      config for the framework-idiomatic patterns that aren't bugs: naive
+      `datetime` for Airflow's `start_date`, and `dbutils`/`spark` as
+      Databricks-injected notebook globals).
+
+Milestone 6 (Looker Studio) is the only thing left open — the report build
+itself is a manual browser step (see above); everything code/data-side is
+done.

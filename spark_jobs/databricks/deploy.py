@@ -19,7 +19,6 @@ from __future__ import annotations
 import argparse
 import base64
 import os
-import sys
 import time
 from pathlib import Path
 
@@ -76,7 +75,9 @@ def upload_to_volume(local_path: Path, volume_path: str) -> None:
 def get_serverless_warehouse_id() -> str:
     warehouses = _api("GET", "/api/2.0/sql/warehouses").json().get("warehouses", [])
     if not warehouses:
-        raise RuntimeError("No SQL warehouse found in this workspace — create one first (Free Edition ships one by default).")
+        raise RuntimeError(
+            "No SQL warehouse found in this workspace — create one first (Free Edition ships one by default)."
+        )
     warehouse = warehouses[0]
     print(f"  using SQL warehouse '{warehouse['name']}' ({warehouse['id']})")
     return warehouse["id"]

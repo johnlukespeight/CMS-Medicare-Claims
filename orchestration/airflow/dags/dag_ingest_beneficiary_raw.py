@@ -18,7 +18,6 @@ from pathlib import Path
 
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException
-
 from lib.beneficiary_ingest import build_manifest_entry, load_to_bigquery, validate_dataframe
 
 logger = logging.getLogger(__name__)

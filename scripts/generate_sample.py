@@ -28,9 +28,8 @@ def main() -> None:
     # pandas >=2.2 excludes the grouping column from `apply` by default unless
     # columns are selected explicitly first (df.columns) — otherwise
     # SP_STATE_CODE disappears from the result.
-    stratified = (
-        df.groupby("SP_STATE_CODE", group_keys=False)[df.columns]
-        .apply(lambda g: g.sample(n=min(len(g), PER_STATE_SAMPLE_SIZE), random_state=RANDOM_SEED))
+    stratified = df.groupby("SP_STATE_CODE", group_keys=False)[df.columns].apply(
+        lambda g: g.sample(n=min(len(g), PER_STATE_SAMPLE_SIZE), random_state=RANDOM_SEED)
     )
 
     sample = (

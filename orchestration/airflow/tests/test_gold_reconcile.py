@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from lib.gold_reconcile import compare_gold_metrics, get_bigquery_gold_metrics, get_databricks_gold_metrics
 
 

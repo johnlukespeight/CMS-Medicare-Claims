@@ -28,7 +28,7 @@ from delta import configure_spark_with_delta_pip
 from pyspark.sql import SparkSession
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from transforms.beneficiary_transforms import RAW_SCHEMA, to_bronze, to_silver  # noqa: E402
+from transforms.beneficiary_transforms import RAW_SCHEMA, to_bronze, to_silver
 
 # See spark_jobs/tests/conftest.py for why this matters — without it, worker
 # subprocesses can pick up a different Python than the driver.

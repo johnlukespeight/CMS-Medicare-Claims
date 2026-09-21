@@ -122,9 +122,13 @@ CMS-Medicare-Claims/
 ├── PRODUCT_SPEC.md
 ├── README.md
 ├── Makefile
+├── pyproject.toml                # ruff + black config, see Milestone 8
 ├── docker-compose.yml            # local Airflow: webserver, scheduler, postgres
 ├── .env.example
 ├── .gitignore
+├── .github/
+│   └── workflows/
+│       └── ci.yml                # lint, unit tests, dbt parse -- no cloud credentials, see §28 Milestone 8
 ├── .claude/
 │   └── agents/
 │       └── data-pipeline-reviewer.md
@@ -140,6 +144,7 @@ CMS-Medicare-Claims/
 │       └── dags/
 │           ├── dag_ingest_beneficiary_raw.py
 │           ├── dag_spark_bronze_silver.py
+│           ├── dag_full_pipeline.py  # Milestone 8 -- triggers the four DAGs below, fan-out/fan-in
 │           ├── dag_dbt_transform.py
 │           └── dag_gold_reconcile.py
 ├── spark_jobs/
@@ -464,6 +469,12 @@ committed); `.env.example` documents keys with placeholder values only.
    BigQuery sandbox project's marts — a browser step, not part of the
    automated `make` targets (there's no local report file/CLI to drive).
    See `dashboards/looker_studio/README.md`.
+8. `make airflow-unpause-all && make demo` — the whole pipeline, one
+   command: triggers `dag_full_pipeline`, which fans out ingest into
+   Databricks + dbt in parallel, then reconciles them. See README's "Full
+   pipeline walkthrough."
+9. `make lint` / `make format-check` / `make ci` — the same checks
+   `.github/workflows/ci.yml` runs, locally, before pushing.
 
 # 20. Testing Strategy
 
@@ -629,16 +640,24 @@ free, browser-based, and BigQuery-native, so it's buildable without a VM).
 
 ## Milestone 8 — Integrated Demo & Hardening
 ### Deliverables
-- One Airflow DAG (or a documented DAG dependency chain) demonstrating
-  ingest → Spark/Databricks → dbt/BigQuery → reconcile, runnable end to end
-  from a clean state.
+- One Airflow DAG (`dag_full_pipeline`, via `TriggerDagRunOperator`
+  fan-out/fan-in) demonstrating ingest → Spark/Databricks → dbt/BigQuery →
+  reconcile, runnable end to end from a clean state (`make demo`).
 - README walkthrough + a simple architecture diagram.
-- Basic CI (lint + PySpark unit tests + `dbt build` against a test target,
-  if feasible without paid CI minutes/cloud cost).
-### Acceptance criteria
+- Basic CI (`.github/workflows/ci.yml`): lint (`ruff`/`black`), PySpark
+  unit tests, ingestion/Databricks-job/reconcile and Streamlit unit tests,
+  and `dbt parse` (structural validation, not a full `dbt build` — that
+  needs live BigQuery credentials, which isn't worth wiring into CI for
+  this project; real `dbt build` verification already happened manually
+  and is documented with exact numbers). All on GitHub's free tier.
+### Acceptance criteria — met
 - A cold clone of the repo, following the README, can reproduce the full
   pipeline through to both BI surfaces using only sandbox/free-tier
-  credentials.
+  credentials. Verified live: `dag_full_pipeline` triggered end to end,
+  all four sub-DAGs succeeded, the two parallel branches (Databricks,
+  dbt/BigQuery) genuinely ran concurrently (confirmed via task timestamps),
+  and `dag_gold_reconcile` reconciled to the exact expected totals
+  (116,352 beneficiaries, $465,233,840) in ~2.5 minutes start to finish.
 
 # 29. First Tasks for the Coding Agent
 

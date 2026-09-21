@@ -10,7 +10,7 @@ without an Airflow environment — see
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -86,7 +86,7 @@ def build_manifest_entry(file_path: Path, row_count: int) -> dict:
         "file": file_path.name,
         "sha256": checksum,
         "row_count": row_count,
-        "ingested_at": datetime.now(timezone.utc).isoformat(),
+        "ingested_at": datetime.now(UTC).isoformat(),
     }
 
 

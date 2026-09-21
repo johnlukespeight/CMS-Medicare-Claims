@@ -18,9 +18,8 @@ from pathlib import Path
 import altair as alt
 import pandas as pd
 import streamlit as st
-from dotenv import load_dotenv
-
 from data_access import CONDITION_COLUMNS, load_beneficiary_gold
+from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
@@ -49,19 +48,13 @@ def _load_data(backend: str) -> pd.DataFrame:
 def main() -> None:
     backend = os.environ.get("STREAMLIT_BACKEND", "duckdb")
     st.title("Medicare Claims Explorer")
-    st.caption(
-        f"CMS DE-SynPUF 2008 Beneficiary Summary File (synthetic data) — backend: `{backend}`"
-    )
+    st.caption(f"CMS DE-SynPUF 2008 Beneficiary Summary File (synthetic data) — backend: `{backend}`")
 
     df = _load_data(backend)
 
     st.sidebar.header("Filters")
-    states = st.sidebar.multiselect(
-        "State", sorted(df["state_abbr"].dropna().unique()), default=[]
-    )
-    age_bands = st.sidebar.multiselect(
-        "Age band", ["Under 65", "65-74", "75-84", "85+"], default=[]
-    )
+    states = st.sidebar.multiselect("State", sorted(df["state_abbr"].dropna().unique()), default=[])
+    age_bands = st.sidebar.multiselect("Age band", ["Under 65", "65-74", "75-84", "85+"], default=[])
     condition_choices = st.sidebar.multiselect(
         "Chronic condition (any of)",
         options=CONDITION_COLUMNS,
@@ -117,7 +110,9 @@ def main() -> None:
                 alt.Chart(filtered)
                 .mark_bar()
                 .encode(
-                    x=alt.X("total_medicare_reimbursement:Q", bin=alt.Bin(maxbins=40), title="Total Medicare-paid cost ($)"),
+                    x=alt.X(
+                        "total_medicare_reimbursement:Q", bin=alt.Bin(maxbins=40), title="Total Medicare-paid cost ($)"
+                    ),
                     y=alt.Y("count():Q", title="Beneficiaries"),
                 )
             )

@@ -28,9 +28,7 @@ def get_job_id_by_name(host: str, token: str, name: str = JOB_NAME) -> int:
     resp.raise_for_status()
     jobs = resp.json().get("jobs", [])
     if not jobs:
-        raise ValueError(
-            f"No Databricks job named '{name}' found. Run `python spark_jobs/databricks/deploy.py` first."
-        )
+        raise ValueError(f"No Databricks job named '{name}' found. Run `python spark_jobs/databricks/deploy.py` first.")
     return jobs[0]["job_id"]
 
 
@@ -41,9 +39,7 @@ def trigger_run(host: str, token: str, job_id: int) -> int:
 
 
 def get_run_state(host: str, token: str, run_id: int) -> dict:
-    resp = requests.get(
-        f"{host}/api/2.2/jobs/runs/get", headers=_headers(token), params={"run_id": run_id}, timeout=30
-    )
+    resp = requests.get(f"{host}/api/2.2/jobs/runs/get", headers=_headers(token), params={"run_id": run_id}, timeout=30)
     resp.raise_for_status()
     return resp.json()["state"]
 

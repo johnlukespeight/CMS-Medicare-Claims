@@ -2,7 +2,6 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-
 from data_access import BENEFICIARY_COLUMNS, CONDITION_COLUMNS, SAMPLE_CSV_PATH, load_beneficiary_gold
 
 
@@ -35,8 +34,17 @@ def test_duckdb_backend_matches_hand_computed_row(duckdb_df):
     result_row = duckdb_df[duckdb_df["desynpuf_id"] == raw_row["DESYNPUF_ID"]].iloc[0]
 
     condition_raw_cols = [
-        "SP_ALZHDMTA", "SP_CHF", "SP_CHRNKIDN", "SP_CNCR", "SP_COPD", "SP_DEPRESSN",
-        "SP_DIABETES", "SP_ISCHMCHT", "SP_OSTEOPRS", "SP_RA_OA", "SP_STRKETIA",
+        "SP_ALZHDMTA",
+        "SP_CHF",
+        "SP_CHRNKIDN",
+        "SP_CNCR",
+        "SP_COPD",
+        "SP_DEPRESSN",
+        "SP_DIABETES",
+        "SP_ISCHMCHT",
+        "SP_OSTEOPRS",
+        "SP_RA_OA",
+        "SP_STRKETIA",
     ]
     expected_count = sum(raw_row[c] == "1" for c in condition_raw_cols)
     assert result_row["chronic_condition_count"] == expected_count

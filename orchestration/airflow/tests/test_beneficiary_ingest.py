@@ -2,10 +2,11 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-
 from lib.beneficiary_ingest import EXPECTED_COLUMNS, build_manifest_entry, validate_dataframe
 
-SAMPLE_PATH = Path(__file__).resolve().parent.parent.parent.parent / "data" / "samples" / "beneficiary_summary_sample.csv"
+SAMPLE_PATH = (
+    Path(__file__).resolve().parent.parent.parent.parent / "data" / "samples" / "beneficiary_summary_sample.csv"
+)
 
 
 @pytest.fixture

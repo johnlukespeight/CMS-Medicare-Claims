@@ -200,3 +200,40 @@ concept to manage. `docs/GOVERNANCE.md` and `docs/IMPLEMENTATION_SPEC.md`
 §24 updated accordingly: no `.pbix`-with-embedded-credentials risk to guard
 against, since the report holds no local credential file at all — it
 authenticates as whichever Google account is viewing/editing it.
+
+## ADR-011 — `dag_full_pipeline` triggers sub-DAGs rather than owning their tasks; CI stops at `dbt parse`, not `dbt build`
+
+**Status:** Accepted
+**Context:** Milestone 8 needs one runnable, demonstrable end-to-end
+pipeline. Each milestone (1, 3, 4, 5) already has its own independently
+useful, independently testable DAG. Rewriting their tasks into one giant
+DAG would duplicate logic and lose that independent testability. Separately,
+"basic CI" needs to run on every push without needing live BigQuery/
+Databricks credentials wired into GitHub Actions (a public repo — those
+secrets would be exposed to anyone who can open a PR).
+**Decision:**
+- `dag_full_pipeline` uses `TriggerDagRunOperator` (`wait_for_completion=True`)
+  to trigger and wait on the four existing DAGs, never reimplementing their
+  tasks. Fan-out/fan-in: `ingest` → [`spark_bronze_silver`, `dbt_transform`]
+  → `gold_reconcile`, since the lakehouse and warehouse paths don't
+  actually depend on each other's output, only on ingestion having landed
+  the raw file.
+- CI (`.github/workflows/ci.yml`) runs lint, all local-only unit tests
+  (PySpark, ingestion/Databricks-job/reconcile logic, Streamlit
+  data-access), and `dbt parse` — which validates the dbt project's
+  structure (refs resolve, YAML is valid, macros compile) without
+  connecting to BigQuery, confirmed empirically: `dbt compile` and
+  `dbt build` both fail immediately without valid credentials, `dbt parse`
+  does not. A full `dbt build`/Databricks job run in CI would need real
+  sandbox secrets exposed to GitHub Actions on a public repo, for
+  verification this project already did manually and documented with
+  exact numbers (README, ADR-005 through ADR-009) — not worth the
+  trade-off for a portfolio project's automated regression checks.
+**Consequences:** `dag_full_pipeline` requires every sub-DAG to be
+unpaused first (`make airflow-unpause-all`) — a paused DAG's triggered
+runs sit in `queued` forever, a real gotcha hit and documented, not
+theoretical. CI can't catch a BigQuery-dialect-specific SQL bug (the
+project already hit two of these firsthand — BigQuery's `UNPIVOT` alias
+syntax and `accepted_values`' default string-quoting — both caught by
+manual testing, not lint); `dbt parse` only guards against structural
+regressions (broken refs, YAML typos), not runtime SQL correctness.

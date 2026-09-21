@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pyspark.sql import Column, DataFrame
 from pyspark.sql import functions as F
-from pyspark.sql.types import DateType, DoubleType, IntegerType, StringType, StructField, StructType
+from pyspark.sql.types import DoubleType, IntegerType, StringType, StructField, StructType
 
 # Raw CMS DE-SynPUF schema (docs/IMPLEMENTATION_SPEC.md §7.1). All source
 # columns arrive as strings; bronze casts each to its correct type and

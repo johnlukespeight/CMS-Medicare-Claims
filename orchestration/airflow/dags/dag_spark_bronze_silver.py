@@ -16,7 +16,6 @@ from datetime import datetime
 
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException
-
 from lib.databricks_job import JOB_NAME, get_job_id_by_name, poll_run_until_terminal, trigger_run
 
 logger = logging.getLogger(__name__)

@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from lib.databricks_job import get_job_id_by_name, poll_run_until_terminal, trigger_run
 
 HOST = "https://example.cloud.databricks.com"

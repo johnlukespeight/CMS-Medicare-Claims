@@ -1,4 +1,4 @@
-.PHONY: setup setup-spark sample-data profile ingest-test spark-test spark-run databricks-deploy databricks-run dbt-seed dbt-build dbt-docs streamlit-test streamlit-run streamlit-run-bigquery airflow-up airflow-down airflow-logs clean
+.PHONY: setup setup-spark sample-data profile ingest-test spark-test spark-run databricks-deploy databricks-run dbt-seed dbt-build dbt-docs dbt-parse streamlit-test streamlit-run streamlit-run-bigquery airflow-up airflow-down airflow-logs airflow-unpause-all demo lint format-check ci clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -72,6 +72,9 @@ dbt-build: ## Run all dbt models + tests against the BigQuery sandbox project.
 dbt-docs: ## Generate and serve the dbt docs lineage graph (localhost:8082).
 	cd dbt/medicare_claims && $(LOAD_ENV) $(DBT) docs generate && $(DBT) docs serve --port 8082
 
+dbt-parse: ## Validate the dbt project's structure (refs, YAML, macros) -- no BigQuery connection needed. What CI runs.
+	cd dbt/medicare_claims && GCP_PROJECT_ID=ci-placeholder-project GOOGLE_APPLICATION_CREDENTIALS=/tmp/ci-fake-credentials.json ../../$(VENV)/bin/dbt parse
+
 # --- Milestone 7 : Streamlit Exploration App --------------------------------
 
 streamlit-test: ## Unit-test the data-access layer (DuckDB backend, no cloud needed).
@@ -83,8 +86,6 @@ streamlit-run: ## Run the app locally against the fixture sample (STREAMLIT_BACK
 streamlit-run-bigquery: ## Run the app against the live BigQuery sandbox project.
 	STREAMLIT_BACKEND=bigquery $(VENV)/bin/streamlit run streamlit_app/app.py
 
-# --- Later milestones (stubs until their milestone lands) ----------------
-
 airflow-up: ## Start local Airflow via Docker Compose (webserver at localhost:8081).
 	docker compose up -d --build
 
@@ -93,6 +94,26 @@ airflow-down: ## Stop local Airflow.
 
 airflow-logs: ## Tail local Airflow scheduler/webserver logs.
 	docker compose logs -f airflow-scheduler airflow-webserver
+
+# --- Milestone 8 : Integrated Demo & Hardening ------------------------------
+
+airflow-unpause-all: ## Unpause every DAG -- required once before dag_full_pipeline can actually run (a paused DAG's triggered runs sit in `queued` forever).
+	docker compose exec -T airflow-scheduler airflow dags unpause dag_ingest_beneficiary_raw
+	docker compose exec -T airflow-scheduler airflow dags unpause dag_spark_bronze_silver
+	docker compose exec -T airflow-scheduler airflow dags unpause dag_dbt_transform
+	docker compose exec -T airflow-scheduler airflow dags unpause dag_gold_reconcile
+	docker compose exec -T airflow-scheduler airflow dags unpause dag_full_pipeline
+
+demo: ## Trigger the full end-to-end pipeline (ingest -> Databricks + dbt in parallel -> reconcile). Watch it at localhost:8081.
+	docker compose exec -T airflow-scheduler airflow dags trigger dag_full_pipeline
+
+lint: ## Lint Python files with ruff.
+	$(VENV)/bin/ruff check .
+
+format-check: ## Check Python formatting with black (no changes made).
+	$(VENV)/bin/black --check .
+
+ci: lint format-check ingest-test streamlit-test dbt-parse ## Everything CI runs, minus spark-test (separate venv/Java -- run it too before pushing).
 
 clean: ## Remove local venvs and Python caches.
 	rm -rf $(VENV) $(SPARK_VENV)

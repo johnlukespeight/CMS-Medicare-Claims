@@ -18,7 +18,6 @@ from datetime import datetime
 
 from airflow.decorators import dag, task
 from airflow.exceptions import AirflowException
-
 from lib.gold_reconcile import compare_gold_metrics, get_bigquery_gold_metrics, get_databricks_gold_metrics
 
 logger = logging.getLogger(__name__)

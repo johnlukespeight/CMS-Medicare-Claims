@@ -16,11 +16,13 @@
 import sys
 
 sys.path.insert(0, "__WORKSPACE_DIR__")
-from beneficiary_transforms import RAW_SCHEMA, to_bronze, to_silver  # noqa: E402
+from beneficiary_transforms import RAW_SCHEMA, to_bronze, to_silver
 
 # COMMAND ----------
 
-dbutils.widgets.text("raw_csv_path", "/Volumes/medicare/bronze/raw_files/DE1_0_2008_Beneficiary_Summary_File_Sample_1.csv")
+dbutils.widgets.text(
+    "raw_csv_path", "/Volumes/medicare/bronze/raw_files/DE1_0_2008_Beneficiary_Summary_File_Sample_1.csv"
+)
 raw_csv_path = dbutils.widgets.get("raw_csv_path")
 
 # COMMAND ----------
