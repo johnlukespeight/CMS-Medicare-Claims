@@ -581,9 +581,14 @@ Streamlit app or dashboards is in scope.
 ## Milestone 5 — Reconciliation
 ### Deliverables
 - `dag_gold_reconcile` comparing Databricks and BigQuery gold-layer totals.
-### Acceptance criteria
+### Acceptance criteria — met
 - DAG fails loudly on an intentionally introduced mismatch (test this once),
-  passes on the real matched pipeline.
+  passes on the real matched pipeline. Both verified live: a Databricks SQL
+  `UPDATE` (BigQuery Sandbox mode blocks DML, so the deliberate mismatch had
+  to go on the Databricks side) produced an exact diagnostic
+  (`total_medicare_reimbursement mismatch: Databricks=465234340.00
+  BigQuery=465233840.00 (diff=500.00, tolerance=1.0)`); reverting via
+  `make databricks-run` restored a passing run.
 
 ## Milestone 6 — Power BI Dashboard
 ### Deliverables

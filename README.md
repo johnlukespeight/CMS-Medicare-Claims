@@ -250,5 +250,24 @@ or gold SQL changes.
       `notebooks/00_data_profiling.ipynb`'s original findings exactly (e.g.
       42.06% ischemic heart disease, 37.87% diabetes)
 
-Next: **Milestone 5 — Reconciliation** (see spec §28) — cross-checks the
-Databricks and BigQuery gold layers against each other.
+**Milestone 5 — Reconciliation: done.**
+
+- [x] `dag_gold_reconcile`: fetches `COUNT(*)`/`SUM(total_medicare_reimbursement)`
+      from Databricks `gold.beneficiary_cost_summary` (via the SQL
+      Statement Execution API) and BigQuery `fct_beneficiary_annual_cost`
+      (via the `google-cloud-bigquery` client) in parallel, then compares
+      them — exact match on beneficiary count, $1 tolerance on the cost sum
+      (defensive practice for cross-engine float summation, even though
+      both report exactly $465,233,840.00 in practice)
+- [x] **Verified both halves of the acceptance criteria for real**, not
+      just by reasoning about the code: ran the DAG against the untouched
+      pipeline (passed), used a Databricks SQL `UPDATE` to intentionally
+      add $500 to one beneficiary's cost (BigQuery's free-tier Sandbox mode
+      blocks DML entirely, so the deliberate mismatch had to go on the
+      Databricks side), re-ran the DAG and watched it **fail with an exact,
+      actionable diagnostic** (`total_medicare_reimbursement mismatch:
+      Databricks=465234340.00 BigQuery=465233840.00 (diff=500.00,
+      tolerance=1.0)`), then reverted via `make databricks-run`
+      (full-refresh) and confirmed the DAG passes again
+
+Next: **Milestone 6 — Power BI Dashboard** (see spec §28).
