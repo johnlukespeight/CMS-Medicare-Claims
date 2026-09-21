@@ -1,0 +1,20 @@
+version: 2
+
+seeds:
+  - name: ssa_state_codes
+    description: >
+      SSA (not FIPS) state code -> abbreviation/name lookup, verified
+      against the official CMS DE-SynPUF codebook (BEN-7, SP_STATE_CODE) —
+      same source data as spark_jobs/transforms/beneficiary_transforms.py's
+      SSA_STATE_CODE_TO_STATE, kept as this dbt project's own copy per
+      ADR-001 (each path owns its own decode logic).
+    columns:
+      - name: state_code
+        description: 2-digit SSA state code, e.g. "05" for California.
+        data_tests:
+          - unique
+          - not_null
+      - name: state_abbr
+        data_tests:
+          - unique
+          - not_null

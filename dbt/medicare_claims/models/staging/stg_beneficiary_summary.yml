@@ -1,0 +1,41 @@
+version: 2
+
+models:
+  - name: stg_beneficiary_summary
+    description: >
+      1:1 with the raw source, renamed to snake_case, typed, and with the
+      11 chronic-condition flags decoded to booleans.
+    columns:
+      - name: desynpuf_id
+        description: Synthetic beneficiary ID (natural key).
+        data_tests:
+          - unique
+          - not_null
+      - name: birth_date
+        data_tests:
+          - not_null
+      - name: sex_cd
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2]
+                quote: false
+      - name: race_cd
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [1, 2, 3, 5]
+                quote: false
+      - name: esrd_ind
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["0", "Y"]
+      - name: state_code
+        description: 2-digit SSA state code (not FIPS) — joins to the ssa_state_codes seed.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('ssa_state_codes')
+                field: state_code

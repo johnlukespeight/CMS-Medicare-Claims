@@ -1,0 +1,17 @@
+# Committed to the repo (unlike a typical ~/.dbt/profiles.yml) because it
+# contains no secrets — everything comes from env_var(), matching how
+# Airflow's DAGs and spark_jobs/databricks/deploy.py already source
+# credentials from .env. Pass --profiles-dir . (the Makefile's dbt-build
+# target does this) so dbt finds it here instead of ~/.dbt/.
+medicare_claims:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: "{{ env_var('BQ_STAGING_DATASET', 'medicare_staging') }}"
+      keyfile: "{{ env_var('GOOGLE_APPLICATION_CREDENTIALS') }}"
+      threads: 4
+      location: US
+      job_execution_timeout_seconds: 300

@@ -1,4 +1,4 @@
-.PHONY: setup setup-spark sample-data profile ingest-test spark-test spark-run databricks-deploy databricks-run dbt-build streamlit-run airflow-up airflow-down airflow-logs clean
+.PHONY: setup setup-spark sample-data profile ingest-test spark-test spark-run databricks-deploy databricks-run dbt-seed dbt-build dbt-docs streamlit-run airflow-up airflow-down airflow-logs clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -16,6 +16,7 @@ setup: ## Create the local venv and install dev tooling.
 	$(VENV)/bin/pip install --upgrade pip -q
 	$(VENV)/bin/pip install -r requirements-dev.txt -q
 	$(VENV)/bin/pip install -r spark_jobs/databricks/requirements.txt -q
+	$(VENV)/bin/pip install -r dbt/requirements.txt -q
 
 sample-data: ## Regenerate the committed fixture sample from the raw CSV.
 	$(PYTHON) scripts/generate_sample.py
@@ -51,14 +52,26 @@ databricks-deploy: ## Upload transforms/notebook/gold SQL + raw CSV, create/upda
 databricks-run: ## Deploy, then trigger the Databricks job and wait for it to finish.
 	$(PYTHON) spark_jobs/databricks/deploy.py --run
 
-# --- Later milestones (stubs until their milestone lands) ----------------
+# --- Milestone 4 : BigQuery + dbt ------------------------------------------
+# env_var() in profiles.yml/dbt_project.yml reads the shell environment, not
+# .env directly, so these targets source .env first.
 
-dbt-build: ## Milestone 4: dbt build against BigQuery.
-	@if [ -d dbt/medicare_claims ]; then \
-		cd dbt/medicare_claims && ../../$(VENV)/bin/dbt build; \
-	else \
-		echo "dbt-build: Milestone 4 (BigQuery + dbt) not yet implemented — see docs/IMPLEMENTATION_SPEC.md §28"; \
-	fi
+DBT := ../../$(VENV)/bin/dbt
+# GOOGLE_APPLICATION_CREDENTIALS in .env is relative to the repo root (as
+# used by spark_jobs/databricks/deploy.py etc.) — re-exported as absolute
+# here since these targets `cd` into dbt/medicare_claims first.
+LOAD_ENV := set -a; . ../../.env; export GOOGLE_APPLICATION_CREDENTIALS=$(CURDIR)/secrets/gcp-service-account.json; set +a;
+
+dbt-seed: ## Load the ssa_state_codes reference seed into BigQuery.
+	cd dbt/medicare_claims && $(LOAD_ENV) $(DBT) seed
+
+dbt-build: ## Run all dbt models + tests against the BigQuery sandbox project.
+	cd dbt/medicare_claims && $(LOAD_ENV) $(DBT) build
+
+dbt-docs: ## Generate and serve the dbt docs lineage graph (localhost:8082).
+	cd dbt/medicare_claims && $(LOAD_ENV) $(DBT) docs generate && $(DBT) docs serve --port 8082
+
+# --- Later milestones (stubs until their milestone lands) ----------------
 
 streamlit-run: ## Milestone 7: run the Streamlit exploration app locally.
 	@if [ -f streamlit_app/app.py ]; then \

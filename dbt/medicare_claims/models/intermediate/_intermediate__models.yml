@@ -1,0 +1,45 @@
+version: 2
+
+models:
+  - name: int_beneficiary_chronic_conditions
+    description: >
+      Unpivoted -- one row per beneficiary x condition (11 rows per
+      beneficiary), for prevalence analysis.
+    columns:
+      - name: desynpuf_id
+        data_tests:
+          - not_null
+      - name: condition
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                - alzheimers
+                - chf
+                - chronic_kidney_disease
+                - cancer
+                - copd
+                - depression
+                - diabetes
+                - ischemic_heart_disease
+                - osteoporosis
+                - rheumatoid_or_osteoarthritis
+                - stroke_or_tia
+      - name: has_condition
+        data_tests:
+          - not_null
+
+  - name: int_beneficiary_annual_cost
+    description: >
+      One row per beneficiary. total_cost_2008 is the Medicare-paid
+      portion only (MEDREIMB_IP+OP+CAR) -- never combined with
+      beneficiary-paid amounts, see spec §14.
+    columns:
+      - name: desynpuf_id
+        data_tests:
+          - unique
+          - not_null
+      - name: total_cost_2008
+        data_tests:
+          - not_null

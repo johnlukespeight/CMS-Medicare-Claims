@@ -83,10 +83,23 @@ To re-run the data profiling notebook against the full raw file:
 make profile
 ```
 
-Other `make` targets (`dbt-build`, `streamlit-run`) are stubbed until their
-milestone lands — see
-[`docs/IMPLEMENTATION_SPEC.md` §28](docs/IMPLEMENTATION_SPEC.md) for the
-full milestone list and current progress.
+dbt (`dbt/medicare_claims/`) runs against the same BigQuery sandbox project
+as the ingestion DAG — no extra cloud setup needed beyond the GCP section
+below:
+
+```bash
+make dbt-seed    # loads the ssa_state_codes reference table
+make dbt-build   # seed + staging/intermediate/marts models + all tests
+make dbt-docs    # generate + serve the lineage graph at localhost:8082
+```
+
+`dag_dbt_transform` (Airflow) runs `dbt build` from a separate venv baked
+into the Airflow image (`/opt/dbt-venv`) — see ADR-008 for why it's isolated
+from Airflow's own Python environment.
+
+Other `make` targets (`streamlit-run`) are stubbed until their milestone
+lands — see [`docs/IMPLEMENTATION_SPEC.md` §28](docs/IMPLEMENTATION_SPEC.md)
+for the full milestone list and current progress.
 
 ### GCP sandbox setup (one-time, for the BigQuery path)
 
@@ -211,4 +224,31 @@ or gold SQL changes.
   see ADR-007 for how that changed the job's shape from what was originally
   planned
 
-Next: **Milestone 4 — BigQuery + dbt** (see spec §28).
+**Milestone 4 — BigQuery + dbt: done.**
+
+- [x] `dbt/medicare_claims/`: `stg_beneficiary_summary` (staging) →
+      `int_beneficiary_chronic_conditions` / `int_beneficiary_annual_cost`
+      (intermediate) → `dim_beneficiary` / `fct_beneficiary_annual_cost` /
+      `mart_chronic_condition_prevalence` / `mart_state_cost_summary`
+      (marts) — the same decode/aggregation logic as Milestones 2-3,
+      independently reimplemented in dbt SQL per ADR-001 (each path owns its
+      own logic)
+- [x] `ssa_state_codes` dbt **seed** (not a hardcoded `CASE WHEN`) — same
+      CMS-codebook-verified data as `beneficiary_transforms.py`'s lookup
+- [x] 42/42 `dbt build` tests pass, including `accepted_values` and a
+      `relationships` foreign-key test from `fct_beneficiary_annual_cost` to
+      `dim_beneficiary`; `dbt docs generate` produces a browsable lineage
+      graph (`make dbt-docs`)
+- [x] `dag_dbt_transform` (Airflow) runs `dbt build` from an isolated venv
+      (`/opt/dbt-venv`) — installing dbt into Airflow's *own* environment
+      produced ~30 real dependency conflicts (protobuf, pandas,
+      opentelemetry), confirmed by actually trying it; see ADR-008
+- [x] Ran end to end, both via `make dbt-build` and a live Airflow trigger:
+      all marts land at exactly 116,352 rows (stg/dim/fct) and 583
+      (`mart_chronic_condition_prevalence`, 11 conditions × 52 states + 11
+      "All States" rows); prevalence rates match
+      `notebooks/00_data_profiling.ipynb`'s original findings exactly (e.g.
+      42.06% ischemic heart disease, 37.87% diabetes)
+
+Next: **Milestone 5 — Reconciliation** (see spec §28) — cross-checks the
+Databricks and BigQuery gold layers against each other.

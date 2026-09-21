@@ -117,3 +117,30 @@ against the real 116,352-row file: bronze/silver/gold row counts match
 Milestone 2's local run exactly, and `gold.chronic_condition_prevalence`'s
 overall rates match `notebooks/00_data_profiling.ipynb`'s findings exactly
 (e.g. ischemic heart disease 42.1%, diabetes 37.9%).
+
+## ADR-008 — dbt runs from its own venv inside the Airflow image, not Airflow's
+
+**Status:** Accepted
+**Context:** Milestone 4 initially tried installing `dbt-core`/`dbt-bigquery`
+directly into `orchestration/airflow/requirements.txt`, alongside Airflow's
+own dependencies. Building that image surfaced ~30 real `pip` dependency
+conflicts: `protobuf` 6.x (pulled in by dbt) against every `google-cloud-*`
+package pinning `<6.0`, `pandas` 3.x against
+`apache-airflow-providers-google`'s `<2.2` pin, and an `opentelemetry`
+version mismatch. This is confirmed, not theoretical — it's also the
+well-known reason tools like Astronomer's Cosmos exist.
+**Decision:** `orchestration/airflow/Dockerfile` builds a second venv at
+`/opt/dbt-venv` (via a `USER root` step to create it, then back to
+`USER airflow` to install into it) with its own
+`orchestration/airflow/dbt-requirements.txt`, completely separate from
+Airflow's own `site-packages`. `dag_dbt_transform.py` invokes
+`/opt/dbt-venv/bin/dbt build` via `@task.bash`, never importing `dbt` into
+an Airflow process. The dbt project itself
+(`dbt/medicare_claims/`) is bind-mounted into the container read-write so
+`dbt build`'s `target/` output lands back on the host for inspection.
+**Consequences:** No Cosmos dependency needed for a project this size — a
+second venv in the same image achieves the same isolation with one existing
+tool (Docker), consistent with the "simplest design" principle. The
+`dbt-requirements.txt`/`dbt/requirements.txt` version pins must be kept in
+sync by hand (documented in both files) since the Docker build context
+doesn't cross into `dbt/`.

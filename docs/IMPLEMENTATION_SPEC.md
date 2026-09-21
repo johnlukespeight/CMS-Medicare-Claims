@@ -153,10 +153,17 @@ CMS-Medicare-Claims/
 │   └── tests/
 │       └── test_beneficiary_transforms.py
 ├── dbt/
+│   ├── requirements.txt
 │   └── medicare_claims/
 │       ├── dbt_project.yml
+│       ├── profiles.yml               # no secrets -- env_var() only, see ADR-008
+│       ├── macros/
+│       │   └── generate_schema_name.sql
+│       ├── seeds/
+│       │   └── ssa_state_codes.csv    # same CMS-verified lookup as beneficiary_transforms.py
 │       ├── models/
 │       │   ├── staging/
+│       │   │   ├── _medicare_raw__sources.yml
 │       │   │   ├── stg_beneficiary_summary.sql
 │       │   │   └── stg_beneficiary_summary.yml
 │       │   ├── intermediate/
@@ -167,7 +174,7 @@ CMS-Medicare-Claims/
 │       │       ├── fct_beneficiary_annual_cost.sql
 │       │       ├── mart_chronic_condition_prevalence.sql
 │       │       └── mart_state_cost_summary.sql
-│       └── tests/
+│       └── tests/                     # reserved for singular tests; schema tests live in the .yml files above
 ├── notebooks/
 │   └── 00_data_profiling.ipynb
 ├── dashboards/
@@ -434,8 +441,11 @@ committed); `.env.example` documents keys with placeholder values only.
    `medicare_bronze_silver_gold` job; `make databricks-run` also triggers
    and waits on it. See README's "Databricks setup" and ADR-007 (Free
    Edition is serverless-only, which shapes how this job is built).
-5. `make dbt-build` — run `dbt build` against the BigQuery sandbox project
-   (or a dbt DuckDB target for fully local iteration, if configured).
+5. `make dbt-seed` / `make dbt-build` / `make dbt-docs` — load the
+   `ssa_state_codes` seed, run all staging/intermediate/mart models plus
+   tests, and generate/serve the lineage graph, all against the BigQuery
+   sandbox project already used by ingestion. `dag_dbt_transform` runs
+   `dbt build` inside Airflow from an isolated venv — see ADR-008.
 6. `make streamlit-run` — `streamlit run streamlit_app/app.py` with
    `STREAMLIT_BACKEND=duckdb` for zero-cost local iteration against the
    fixture sample.
@@ -561,11 +571,12 @@ Streamlit app or dashboards is in scope.
 ### Deliverables
 - `dbt/medicare_claims` project: staging, intermediate, and mart models per
   §7.3, with schema tests and `dbt docs`.
-- `dag_dbt_transform` running `dbt build` after ingestion.
-### Acceptance criteria
-- `dbt build` passes all tests; `dbt docs generate` produces a browsable
-  lineage graph; mart row counts/aggregates are sane (spot-checked against
-  the profiling notebook).
+- `dag_dbt_transform` running `dbt build` after ingestion, from an isolated
+  venv (`/opt/dbt-venv`) rather than Airflow's own — see ADR-008.
+### Acceptance criteria — met
+- `dbt build` passes all tests (42/42); `dbt docs generate` produces a
+  browsable lineage graph; mart row counts/aggregates are sane (spot-checked
+  against the profiling notebook — prevalence rates match exactly).
 
 ## Milestone 5 — Reconciliation
 ### Deliverables

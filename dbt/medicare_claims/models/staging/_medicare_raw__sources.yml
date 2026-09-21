@@ -1,0 +1,20 @@
+version: 2
+
+sources:
+  - name: medicare_raw
+    database: "{{ env_var('GCP_PROJECT_ID') }}"
+    schema: "{{ env_var('BQ_RAW_DATASET', 'medicare_raw') }}"
+    description: >
+      Raw CMS DE-SynPUF beneficiary summary file, loaded as-is by Airflow's
+      dag_ingest_beneficiary_raw (full-refresh, WRITE_TRUNCATE) — no
+      transformation happens before this point. See
+      docs/IMPLEMENTATION_SPEC.md §7.3.
+    tables:
+      - name: beneficiary_summary
+        description: One row per synthetic beneficiary, 116,352 rows.
+        columns:
+          - name: DESYNPUF_ID
+            description: Synthetic beneficiary ID (natural key).
+            data_tests:
+              - unique
+              - not_null

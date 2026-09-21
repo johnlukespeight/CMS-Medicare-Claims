@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: dim_beneficiary
+    description: One row per beneficiary -- demographics, state, age band, deceased flag, chronic condition count.
+    columns:
+      - name: desynpuf_id
+        data_tests:
+          - unique
+          - not_null
+      - name: age_band
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["Under 65", "65-74", "75-84", "85+"]
+      - name: chronic_condition_count
+        data_tests:
+          - not_null
+
+  - name: fct_beneficiary_annual_cost
+    description: One row per beneficiary per year (2008 only for now).
+    columns:
+      - name: desynpuf_id
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_beneficiary')
+                field: desynpuf_id
+      - name: total_medicare_reimbursement
+        data_tests:
+          - not_null
+
+  - name: mart_chronic_condition_prevalence
+    description: Prevalence and average cost per condition, by state and overall.
+    columns:
+      - name: condition
+        data_tests:
+          - not_null
+      - name: prevalence_rate
+        data_tests:
+          - not_null
+
+  - name: mart_state_cost_summary
+    description: Enrollment and total/average Medicare-paid cost by state.
+    columns:
+      - name: state_code
+        data_tests:
+          - unique
+          - not_null
+      - name: beneficiary_count
+        data_tests:
+          - not_null

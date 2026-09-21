@@ -17,6 +17,8 @@ x-airflow-common: &airflow-common
     AIRFLOW_DATA_DIR: /opt/airflow/data
     GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
     BQ_RAW_DATASET: ${BQ_RAW_DATASET:-medicare_raw}
+    BQ_STAGING_DATASET: ${BQ_STAGING_DATASET:-medicare_staging}
+    BQ_MARTS_DATASET: ${BQ_MARTS_DATASET:-medicare_marts}
     GOOGLE_APPLICATION_CREDENTIALS: /opt/airflow/secrets/gcp-service-account.json
     DATABRICKS_HOST: ${DATABRICKS_HOST:-}
     DATABRICKS_TOKEN: ${DATABRICKS_TOKEN:-}
@@ -26,6 +28,7 @@ x-airflow-common: &airflow-common
     - ./orchestration/airflow/plugins:/opt/airflow/plugins
     - ./data:/opt/airflow/data
     - ./secrets:/opt/airflow/secrets:ro
+    - ./dbt:/opt/airflow/dbt
   user: "${AIRFLOW_UID:-50000}:0"
   depends_on: &airflow-common-depends-on
     postgres:
