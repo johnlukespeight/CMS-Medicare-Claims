@@ -144,3 +144,29 @@ tool (Docker), consistent with the "simplest design" principle. The
 `dbt-requirements.txt`/`dbt/requirements.txt` version pins must be kept in
 sync by hand (documented in both files) since the Docker build context
 doesn't cross into `dbt/`.
+
+## ADR-009 — Streamlit's BigQuery backend reads `stg_beneficiary_summary` (staging), not just marts
+
+**Status:** Accepted
+**Context:** Milestone 7's sidebar cross-filters (state, age band, *any of*
+several chronic conditions, deceased/alive) all need to apply jointly, then
+drive three views including a per-condition prevalence chart, on the
+filtered subset. No existing mart supports this: `dim_beneficiary` carries
+only the aggregate `chronic_condition_count`, not the 11 individual
+`has_*` flags, and `mart_chronic_condition_prevalence` is pre-aggregated by
+state only — it can't be re-sliced by age band or condition-combination
+after the fact. Spec §6 says dashboards/apps are "read-only consumers of
+gold marts."
+**Decision:** `streamlit_app/data_access.py`'s BigQuery backend joins
+`dim_beneficiary` + `fct_beneficiary_annual_cost` (both marts) with
+`stg_beneficiary_summary` (staging) for the 11 `has_*` columns, fetching
+one row per beneficiary. All filtering/aggregation for the app's three
+views then happens once, client-side in pandas
+(`streamlit_app/app.py`) — allowed under the "pure presentation" carve-out
+in the module-boundary rule, since no business logic (flag decoding, cost
+formulas) is recomputed, only pre-modeled columns are filtered/grouped.
+**Consequences:** A narrow, documented crossing of the "marts only"
+boundary — read-only, adds no new decode/aggregation logic, and is
+reconsidered if a future milestone needs the same per-beneficiary
+condition flags from more than one consumer (at which point a proper
+mart, e.g. a wide `dim_beneficiary_conditions`, would be worth adding).

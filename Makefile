@@ -1,4 +1,4 @@
-.PHONY: setup setup-spark sample-data profile ingest-test spark-test spark-run databricks-deploy databricks-run dbt-seed dbt-build dbt-docs streamlit-run airflow-up airflow-down airflow-logs clean
+.PHONY: setup setup-spark sample-data profile ingest-test spark-test spark-run databricks-deploy databricks-run dbt-seed dbt-build dbt-docs streamlit-test streamlit-run streamlit-run-bigquery airflow-up airflow-down airflow-logs clean
 
 VENV := .venv
 PYTHON := $(VENV)/bin/python
@@ -17,6 +17,7 @@ setup: ## Create the local venv and install dev tooling.
 	$(VENV)/bin/pip install -r requirements-dev.txt -q
 	$(VENV)/bin/pip install -r spark_jobs/databricks/requirements.txt -q
 	$(VENV)/bin/pip install -r dbt/requirements.txt -q
+	$(VENV)/bin/pip install -r streamlit_app/requirements.txt -q
 
 sample-data: ## Regenerate the committed fixture sample from the raw CSV.
 	$(PYTHON) scripts/generate_sample.py
@@ -71,14 +72,18 @@ dbt-build: ## Run all dbt models + tests against the BigQuery sandbox project.
 dbt-docs: ## Generate and serve the dbt docs lineage graph (localhost:8082).
 	cd dbt/medicare_claims && $(LOAD_ENV) $(DBT) docs generate && $(DBT) docs serve --port 8082
 
-# --- Later milestones (stubs until their milestone lands) ----------------
+# --- Milestone 7 : Streamlit Exploration App --------------------------------
 
-streamlit-run: ## Milestone 7: run the Streamlit exploration app locally.
-	@if [ -f streamlit_app/app.py ]; then \
-		$(VENV)/bin/streamlit run streamlit_app/app.py; \
-	else \
-		echo "streamlit-run: Milestone 7 (Streamlit Exploration App) not yet implemented — see docs/IMPLEMENTATION_SPEC.md §28"; \
-	fi
+streamlit-test: ## Unit-test the data-access layer (DuckDB backend, no cloud needed).
+	$(VENV)/bin/pytest streamlit_app/tests -v
+
+streamlit-run: ## Run the app locally against the fixture sample (STREAMLIT_BACKEND=duckdb, zero cloud cost).
+	STREAMLIT_BACKEND=duckdb $(VENV)/bin/streamlit run streamlit_app/app.py
+
+streamlit-run-bigquery: ## Run the app against the live BigQuery sandbox project.
+	STREAMLIT_BACKEND=bigquery $(VENV)/bin/streamlit run streamlit_app/app.py
+
+# --- Later milestones (stubs until their milestone lands) ----------------
 
 airflow-up: ## Start local Airflow via Docker Compose (webserver at localhost:8081).
 	docker compose up -d --build

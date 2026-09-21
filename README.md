@@ -270,4 +270,40 @@ or gold SQL changes.
       tolerance=1.0)`), then reverted via `make databricks-run`
       (full-refresh) and confirmed the DAG passes again
 
-Next: **Milestone 6 — Power BI Dashboard** (see spec §28).
+**Milestone 6 — Power BI Dashboard: deferred.**
+
+Power BI Desktop is Windows-only; this project is being built on macOS, and
+authoring/verifying a `.pbix` needs hands-on GUI work in that tool that
+can't be done or checked without access to it. Deferred rather than
+skipped — revisiting once Windows/Power BI access is available (see spec
+§28 for details). Jumped to Milestone 7 instead, which has no such
+platform blocker.
+
+**Milestone 7 — Streamlit Exploration App: done.**
+
+- [x] `streamlit_app/data_access.py` — one interface, two backends
+      (`STREAMLIT_BACKEND=duckdb` for zero-cost local dev against the
+      fixture sample, `=bigquery` against the live sandbox), both returning
+      the identical per-beneficiary shape so `app.py` filters/aggregates
+      once regardless of backend
+- [x] BigQuery backend joins `dim_beneficiary`/`fct_beneficiary_annual_cost`
+      (marts) with `stg_beneficiary_summary` (staging) for per-beneficiary
+      condition flags — no mart carries those at the right grain for the
+      app's cross-filters; a narrow, documented boundary crossing (ADR-009)
+- [x] Sidebar filters (state, age band, *any of* 11 chronic conditions,
+      deceased/alive) drive three views: a by-state summary table, a cost
+      distribution histogram, and a condition-prevalence bar chart
+- [x] 7 unit tests, including one that cross-checks a DuckDB-backend row
+      against hand-computed values from the raw fixture CSV directly (no
+      hardcoded expectations to go stale)
+- [x] **Verified with a real headless-Chromium/Playwright session**, not
+      just unit tests or a curl smoke test: launched the app, applied
+      filters through actual sidebar UI interactions, confirmed the
+      beneficiary count cascaded correctly (342 → 7 with a state filter →
+      1 with a deceased filter on top), zero browser console errors, and
+      confirmed the BigQuery backend's numbers match Milestone 5's
+      reconciled totals exactly ($465,233,840 total cost; state-by-state
+      counts matching the original profiling notebook)
+
+Next: Milestone 6 once Power BI access is available, or **Milestone 8 —
+Integrated Demo & Hardening** (see spec §28).

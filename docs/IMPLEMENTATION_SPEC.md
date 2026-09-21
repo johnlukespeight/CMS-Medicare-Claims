@@ -182,9 +182,10 @@ CMS-Medicare-Claims/
 │       └── medicare_overview.pbix
 └── streamlit_app/
     ├── app.py
-    ├── data_access.py            # BigQuery/DuckDB query layer
+    ├── data_access.py            # BigQuery/DuckDB query layer, see ADR-009
     ├── requirements.txt
-    └── .streamlit/secrets.toml.example
+    └── tests/
+        └── test_data_access.py   # credentials via .env, not .streamlit/secrets.toml -- consistent with every other component
 ```
 
 # 6. Pipeline-Stage Module Boundaries
@@ -591,6 +592,14 @@ Streamlit app or dashboards is in scope.
   `make databricks-run` restored a passing run.
 
 ## Milestone 6 — Power BI Dashboard
+### Status: deferred
+Power BI Desktop (the tool that authors `.pbix` files) is Windows-only;
+this project is being built on macOS. Authoring and verifying
+`medicare_overview.pbix` needs hands-on interactive GUI work in that tool,
+which isn't something that can be done or verified without access to it.
+Deferred rather than skipped — revisit once Windows/Power BI access (VM,
+browser-based Power BI Service, or otherwise) is available. Milestone 7 was
+built first since it has no such platform blocker.
 ### Deliverables
 - `medicare_overview.pbix` per §16, connected to BigQuery marts.
 ### Acceptance criteria
@@ -600,10 +609,14 @@ Streamlit app or dashboards is in scope.
 ## Milestone 7 — Streamlit Exploration App
 ### Deliverables
 - `streamlit_app/` per §16–17, both BigQuery and DuckDB backends working.
-### Acceptance criteria
+### Acceptance criteria — met
 - App runs locally with `STREAMLIT_BACKEND=duckdb` against the fixture with
   no cloud credentials required; filters update all three views correctly;
   BigQuery backend verified at least once against the sandbox project.
+  Verified with a real headless-Chromium/Playwright session (not just unit
+  tests): sidebar filters cascade correctly (342 → 7 → 1 beneficiaries),
+  zero browser console errors, and the BigQuery backend's numbers match
+  Milestone 5's reconciled totals exactly ($465,233,840).
 
 ## Milestone 8 — Integrated Demo & Hardening
 ### Deliverables
