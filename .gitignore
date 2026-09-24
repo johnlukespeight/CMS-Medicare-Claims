@@ -43,6 +43,10 @@ metastore_db/
 # Milestone 3 ports the same transforms to real Unity Catalog tables)
 data/lakehouse/
 
+# Private, not meant to be open source (the mold this repo was scaffolded
+# from, not part of the project itself — see its own header)
+PROJECT_SCAFFOLD_TEMPLATE.md
+
 # OS
 .DS_Store
 
