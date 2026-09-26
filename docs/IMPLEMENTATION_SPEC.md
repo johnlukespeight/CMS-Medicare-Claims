@@ -487,7 +487,9 @@ aggregation, null-death-date handling.
 ## Integration tests
 dbt tests (`not_null`, `unique` on `DESYNPUF_ID`, `accepted_values` on
 sex/race codes, `relationships` from fact to dimension) run on every
-`dbt build`.
+`dbt build`. dbt unit tests (fixed input rows → expected output) cover the
+flag-decoding, cost-aggregation, and age-band logic, and every mart has an
+enforced model contract (column names + types) — see ADR-012.
 
 ## End-to-end test
 `dag_gold_reconcile` doubles as an e2e check: beneficiary counts and total
@@ -704,7 +706,7 @@ run the diff against `docs/IMPLEMENTATION_SPEC.md` before merging).
 
 # 32. Architecture Decision Records
 
-See `docs/ARCHITECTURE_DECISIONS.md` (ADR-001 through ADR-006 as of this
+See `docs/ARCHITECTURE_DECISIONS.md` (ADR-001 through ADR-012 as of this
 writing) — not duplicated here.
 
 # 33. Definition of Done

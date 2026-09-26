@@ -1,26 +1,73 @@
 version: 2
 
+# Every mart has an enforced model contract (ADR-012): dbt checks the
+# model's column names and BigQuery types against the lists below *before*
+# building the table, so a renamed/retyped/dropped column fails `dbt build`
+# instead of silently changing what Looker Studio and Streamlit read.
+# Changing a column here is a schema change: ADR first (hard constraint #7).
+# not_null constraints are enforced by BigQuery itself at write time; the
+# data_tests alongside them stay as the documented, reportable check.
+
 models:
   - name: dim_beneficiary
     description: One row per beneficiary -- demographics, state, age band, deceased flag, chronic condition count.
+    config:
+      contract:
+        enforced: true
     columns:
       - name: desynpuf_id
+        data_type: string
+        constraints:
+          - type: not_null
         data_tests:
           - unique
           - not_null
+      - name: birth_date
+        data_type: date
+      - name: death_date
+        data_type: date
+        description: NULL when alive as of 2008-12-31 (never imputed, spec §8).
+      - name: is_deceased
+        data_type: bool
+      - name: sex_cd
+        data_type: int64
+      - name: race_cd
+        data_type: int64
+      - name: esrd_ind
+        data_type: string
+      - name: state_code
+        data_type: string
+        description: 2-digit SSA state code (not FIPS).
+      - name: state_abbr
+        data_type: string
+      - name: state_name
+        data_type: string
+      - name: age_2008
+        data_type: int64
+        description: Age as of 2008-12-31.
       - name: age_band
+        data_type: string
         data_tests:
           - accepted_values:
               arguments:
                 values: ["Under 65", "65-74", "75-84", "85+"]
       - name: chronic_condition_count
+        data_type: int64
+        constraints:
+          - type: not_null
         data_tests:
           - not_null
 
   - name: fct_beneficiary_annual_cost
     description: One row per beneficiary per year (2008 only for now).
+    config:
+      contract:
+        enforced: true
     columns:
       - name: desynpuf_id
+        data_type: string
+        constraints:
+          - type: not_null
         data_tests:
           - unique
           - not_null
@@ -28,27 +75,85 @@ models:
               arguments:
                 to: ref('dim_beneficiary')
                 field: desynpuf_id
+      - name: year
+        data_type: int64
+      - name: medreimb_ip
+        data_type: float64
+      - name: medreimb_op
+        data_type: float64
+      - name: medreimb_car
+        data_type: float64
       - name: total_medicare_reimbursement
+        data_type: float64
+        description: Medicare-paid IP + OP + Carrier only (spec §14).
+        constraints:
+          - type: not_null
         data_tests:
           - not_null
+      - name: benres_ip
+        data_type: float64
+      - name: benres_op
+        data_type: float64
+      - name: benres_car
+        data_type: float64
+      - name: total_beneficiary_responsibility
+        data_type: float64
+        description: Beneficiary-paid IP + OP + Carrier, tracked separately from Medicare-paid.
 
   - name: mart_chronic_condition_prevalence
     description: Prevalence and average cost per condition, by state and overall.
+    config:
+      contract:
+        enforced: true
     columns:
       - name: condition
+        data_type: string
+        constraints:
+          - type: not_null
         data_tests:
           - not_null
+      - name: state_abbr
+        data_type: string
+        description: NULL on the overall ("All States") rows.
+      - name: state_name
+        data_type: string
+      - name: total_beneficiaries_in_state
+        data_type: int64
+      - name: beneficiaries_with_condition
+        data_type: int64
       - name: prevalence_rate
+        data_type: float64
+        constraints:
+          - type: not_null
         data_tests:
           - not_null
+      - name: avg_total_cost_with_condition
+        data_type: float64
 
   - name: mart_state_cost_summary
     description: Enrollment and total/average Medicare-paid cost by state.
+    config:
+      contract:
+        enforced: true
     columns:
       - name: state_code
+        data_type: string
+        constraints:
+          - type: not_null
         data_tests:
           - unique
           - not_null
+      - name: state_abbr
+        data_type: string
+      - name: state_name
+        data_type: string
       - name: beneficiary_count
+        data_type: int64
+        constraints:
+          - type: not_null
         data_tests:
           - not_null
+      - name: total_medicare_reimbursement
+        data_type: float64
+      - name: avg_medicare_reimbursement_per_beneficiary
+        data_type: float64

@@ -307,6 +307,10 @@ make streamlit-run-bigquery             # Streamlit against the live data (local
       "All States" rows); prevalence rates match
       `notebooks/00_data_profiling.ipynb`'s original findings exactly (e.g.
       42.06% ischemic heart disease, 37.87% diabetes)
+- [ ] Hardening (ADR-012): enforced model contracts on all four marts and
+      5 dbt unit tests for flag decoding, the Medicare-paid cost sum, and
+      age-band edges. `dbt parse` validates them; they have not yet been
+      run against BigQuery (`make dbt-build`)
 
 **Milestone 5 — Reconciliation: done.**
 
