@@ -237,3 +237,42 @@ project already hit two of these firsthand — BigQuery's `UNPIVOT` alias
 syntax and `accepted_values`' default string-quoting — both caught by
 manual testing, not lint); `dbt parse` only guards against structural
 regressions (broken refs, YAML typos), not runtime SQL correctness.
+
+## ADR-012 — Enforced dbt model contracts on every mart; dbt unit tests for decode/cost logic
+
+**Status:** Accepted
+**Context:** Hard constraint #7 requires an ADR before any mart schema
+change, but nothing mechanical stopped one: a renamed or retyped column
+in a mart's SQL would build fine and silently break Looker Studio and
+Streamlit, which read the marts by column name. Separately, hard
+constraint #8 makes flag decoding (`1=Yes`/`2=No`) and the Medicare-paid
+cost rule (IP + OP + Carrier) deterministic code, but the existing dbt
+`data_tests` only check properties of the real data (`not_null`,
+`accepted_values`), not that the SQL logic itself is right on known
+inputs, including edge cases the real file may not contain.
+**Decision:**
+- All four marts (`dim_beneficiary`, `fct_beneficiary_annual_cost`,
+  `mart_chronic_condition_prevalence`, `mart_state_cost_summary`) set
+  `contract: enforced: true` with a `data_type` for every column and
+  `not_null` constraints on grain keys and headline metrics. dbt checks
+  names and types before creating the table; BigQuery enforces
+  `NOT NULL` at write time. No column is added, removed, or retyped; the
+  contracts record the schema the marts already had.
+- dbt unit tests (dbt >= 1.8, fixed input rows → expected output rows)
+  cover `stg_beneficiary_summary` (flag decoding, per-column flag
+  mapping, date parsing, SSA state-code zero-padding),
+  `int_beneficiary_annual_cost` (Medicare-paid-only sum, negative
+  adjustments preserved), and `dim_beneficiary` (age-band edges on both
+  sides, condition count 0/3/11, deceased flag, seed join).
+- Staging and intermediate models stay uncontracted: they're internal to
+  the dbt project, and contracts are for the interface consumers read.
+**Consequences:** Changing a mart column now has to be done on purpose:
+the YAML contract and the SQL both change, which puts the change in the
+diff where this ADR log's rule can catch it. dbt unit tests run SQL on
+the warehouse, so like the rest of `dbt build` they run against the
+BigQuery sandbox (manually or via `dag_dbt_transform`), not in CI. CI's
+`dbt parse` does validate their YAML and refs. Because the contract
+types come from BigQuery's CSV autodetect on the raw load (e.g. `FLOAT64`
+for the `MEDREIMB_*`/`BENRES_*` amounts), a change to how the raw file
+is loaded would now surface as a contract failure, not a silent type
+drift.

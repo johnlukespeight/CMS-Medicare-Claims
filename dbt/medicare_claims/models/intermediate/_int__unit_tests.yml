@@ -1,0 +1,35 @@
+version: 2
+
+# dbt unit tests for the cost-aggregation rule (spec §14, hard constraint
+# #8). Run on BigQuery as part of `dbt build`; CI's `dbt parse` only
+# validates their structure. Values are exact in binary floating point
+# (.25/.5/.75) so FLOAT64 equality is safe.
+
+unit_tests:
+  - name: test_int_beneficiary_annual_cost_sums_medicare_paid_only
+    description: >
+      total_cost_2008 = MEDREIMB IP + OP + Carrier only, never mixed with
+      beneficiary-paid (BENRES_*) amounts, which get their own total.
+      Negative reimbursements (claim adjustments) are preserved, not
+      clipped (spec §8).
+    model: int_beneficiary_annual_cost
+    given:
+      - input: ref('stg_beneficiary_summary')
+        rows:
+          - {desynpuf_id: "BENE_TYPICAL",
+             medreimb_ip: 1000.25, medreimb_op: 200.5, medreimb_car: 30.75,
+             benres_ip: 100.0, benres_op: 20.0, benres_car: 3.0}
+          - {desynpuf_id: "BENE_ADJUSTMENT",
+             medreimb_ip: -500.0, medreimb_op: 0.0, medreimb_car: 120.0,
+             benres_ip: 0.0, benres_op: 0.0, benres_car: 40.0}
+          - {desynpuf_id: "BENE_NO_CLAIMS",
+             medreimb_ip: 0.0, medreimb_op: 0.0, medreimb_car: 0.0,
+             benres_ip: 0.0, benres_op: 0.0, benres_car: 0.0}
+    expect:
+      rows:
+        - {desynpuf_id: "BENE_TYPICAL", total_cost_2008: 1231.5,
+           total_beneficiary_responsibility_2008: 123.0}
+        - {desynpuf_id: "BENE_ADJUSTMENT", total_cost_2008: -380.0,
+           total_beneficiary_responsibility_2008: 40.0}
+        - {desynpuf_id: "BENE_NO_CLAIMS", total_cost_2008: 0.0,
+           total_beneficiary_responsibility_2008: 0.0}

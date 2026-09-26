@@ -1,0 +1,67 @@
+version: 2
+
+# dbt unit tests (dbt >= 1.8): fixed input rows -> expected output rows,
+# testing the model's SQL logic rather than the warehouse data. Complements
+# the data_tests in stg_beneficiary_summary.yml, which check the real data.
+# Hard constraint #8: flag decoding is deterministic, so it gets a test.
+#
+# Like every dbt unit test, these execute on BigQuery (they run as part of
+# `dbt build`) -- CI's `dbt parse` only validates their structure.
+
+unit_tests:
+  - name: test_stg_beneficiary_summary_decodes_flags_dates_and_state
+    description: >
+      SP_* flags decode 1=Yes/2=No to true/false; YYYYMMDD integers parse
+      to DATEs with a NULL death date staying NULL; single-digit SSA state
+      codes are zero-padded back to 2 digits so they join to the seed.
+    model: stg_beneficiary_summary
+    given:
+      - input: source('medicare_raw', 'beneficiary_summary')
+        rows:
+          # All 11 conditions = Yes, alive, single-digit state code.
+          - {DESYNPUF_ID: "BENE_ALL_YES", BENE_BIRTH_DT: 19430501, BENE_DEATH_DT: null,
+             SP_STATE_CODE: 5,
+             SP_ALZHDMTA: 1, SP_CHF: 1, SP_CHRNKIDN: 1, SP_CNCR: 1, SP_COPD: 1,
+             SP_DEPRESSN: 1, SP_DIABETES: 1, SP_ISCHMCHT: 1, SP_OSTEOPRS: 1,
+             SP_RA_OA: 1, SP_STRKETIA: 1}
+          # All 11 conditions = No, deceased, two-digit state code.
+          - {DESYNPUF_ID: "BENE_ALL_NO", BENE_BIRTH_DT: 19201231, BENE_DEATH_DT: 20081101,
+             SP_STATE_CODE: 45,
+             SP_ALZHDMTA: 2, SP_CHF: 2, SP_CHRNKIDN: 2, SP_CNCR: 2, SP_COPD: 2,
+             SP_DEPRESSN: 2, SP_DIABETES: 2, SP_ISCHMCHT: 2, SP_OSTEOPRS: 2,
+             SP_RA_OA: 2, SP_STRKETIA: 2}
+    expect:
+      rows:
+        - {desynpuf_id: "BENE_ALL_YES", birth_date: "1943-05-01", death_date: null,
+           state_code: "05",
+           has_alzheimers: true, has_chf: true, has_chronic_kidney_disease: true,
+           has_cancer: true, has_copd: true, has_depression: true, has_diabetes: true,
+           has_ischemic_heart_disease: true, has_osteoporosis: true,
+           has_rheumatoid_or_osteoarthritis: true, has_stroke_or_tia: true}
+        - {desynpuf_id: "BENE_ALL_NO", birth_date: "1920-12-31", death_date: "2008-11-01",
+           state_code: "45",
+           has_alzheimers: false, has_chf: false, has_chronic_kidney_disease: false,
+           has_cancer: false, has_copd: false, has_depression: false, has_diabetes: false,
+           has_ischemic_heart_disease: false, has_osteoporosis: false,
+           has_rheumatoid_or_osteoarthritis: false, has_stroke_or_tia: false}
+
+  - name: test_stg_beneficiary_summary_flags_decode_independently
+    description: >
+      Each SP_* column maps to its own has_* column -- a mixed row catches
+      a flag wired to the wrong source column, which the all-Yes/all-No
+      rows above can't.
+    model: stg_beneficiary_summary
+    given:
+      - input: source('medicare_raw', 'beneficiary_summary')
+        rows:
+          - {DESYNPUF_ID: "BENE_MIXED", BENE_BIRTH_DT: 19350715, SP_STATE_CODE: 10,
+             SP_ALZHDMTA: 1, SP_CHF: 2, SP_CHRNKIDN: 1, SP_CNCR: 2, SP_COPD: 1,
+             SP_DEPRESSN: 2, SP_DIABETES: 1, SP_ISCHMCHT: 2, SP_OSTEOPRS: 1,
+             SP_RA_OA: 2, SP_STRKETIA: 1}
+    expect:
+      rows:
+        - {desynpuf_id: "BENE_MIXED",
+           has_alzheimers: true, has_chf: false, has_chronic_kidney_disease: true,
+           has_cancer: false, has_copd: true, has_depression: false, has_diabetes: true,
+           has_ischemic_heart_disease: false, has_osteoporosis: true,
+           has_rheumatoid_or_osteoarthritis: false, has_stroke_or_tia: true}

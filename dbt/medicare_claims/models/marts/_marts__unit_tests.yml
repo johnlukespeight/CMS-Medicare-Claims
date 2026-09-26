@@ -1,0 +1,72 @@
+version: 2
+
+# dbt unit tests for dim_beneficiary's derived columns. Run on BigQuery as
+# part of `dbt build`; CI's `dbt parse` only validates their structure.
+
+unit_tests:
+  - name: test_dim_beneficiary_age_band_boundaries
+    description: >
+      Age is as of 2008-12-31 (spec §14). Because the reference date is the
+      last day of the year, every 2008 birthday has already happened, so
+      the year-boundary DATE_DIFF equals true age. Each band edge is tested
+      on both sides.
+    model: dim_beneficiary
+    given:
+      - input: ref('stg_beneficiary_summary')
+        rows:
+          - {desynpuf_id: "AGE_64", birth_date: "1944-01-01", state_code: "05"}
+          - {desynpuf_id: "AGE_65", birth_date: "1943-12-31", state_code: "05"}
+          - {desynpuf_id: "AGE_74", birth_date: "1934-01-01", state_code: "05"}
+          - {desynpuf_id: "AGE_75", birth_date: "1933-12-31", state_code: "05"}
+          - {desynpuf_id: "AGE_84", birth_date: "1924-01-01", state_code: "05"}
+          - {desynpuf_id: "AGE_85", birth_date: "1923-12-31", state_code: "05"}
+      - input: ref('ssa_state_codes')
+        rows:
+          - {state_code: "05", state_abbr: "CA", state_name: "California"}
+    expect:
+      rows:
+        - {desynpuf_id: "AGE_64", age_2008: 64, age_band: "Under 65"}
+        - {desynpuf_id: "AGE_65", age_2008: 65, age_band: "65-74"}
+        - {desynpuf_id: "AGE_74", age_2008: 74, age_band: "65-74"}
+        - {desynpuf_id: "AGE_75", age_2008: 75, age_band: "75-84"}
+        - {desynpuf_id: "AGE_84", age_2008: 84, age_band: "75-84"}
+        - {desynpuf_id: "AGE_85", age_2008: 85, age_band: "85+"}
+
+  - name: test_dim_beneficiary_condition_count_deceased_flag_and_state
+    description: >
+      chronic_condition_count counts the true has_* flags (0-11);
+      is_deceased follows death_date; state_code joins to the SSA seed.
+    model: dim_beneficiary
+    given:
+      - input: ref('stg_beneficiary_summary')
+        rows:
+          - {desynpuf_id: "NONE_ALIVE", birth_date: "1940-06-15", death_date: null,
+             state_code: "05",
+             has_alzheimers: false, has_chf: false, has_chronic_kidney_disease: false,
+             has_cancer: false, has_copd: false, has_depression: false, has_diabetes: false,
+             has_ischemic_heart_disease: false, has_osteoporosis: false,
+             has_rheumatoid_or_osteoarthritis: false, has_stroke_or_tia: false}
+          - {desynpuf_id: "THREE_DECEASED", birth_date: "1930-02-01", death_date: "2008-07-01",
+             state_code: "45",
+             has_alzheimers: true, has_chf: false, has_chronic_kidney_disease: false,
+             has_cancer: false, has_copd: true, has_depression: false, has_diabetes: true,
+             has_ischemic_heart_disease: false, has_osteoporosis: false,
+             has_rheumatoid_or_osteoarthritis: false, has_stroke_or_tia: false}
+          - {desynpuf_id: "ALL_ELEVEN", birth_date: "1950-03-10", death_date: null,
+             state_code: "05",
+             has_alzheimers: true, has_chf: true, has_chronic_kidney_disease: true,
+             has_cancer: true, has_copd: true, has_depression: true, has_diabetes: true,
+             has_ischemic_heart_disease: true, has_osteoporosis: true,
+             has_rheumatoid_or_osteoarthritis: true, has_stroke_or_tia: true}
+      - input: ref('ssa_state_codes')
+        rows:
+          - {state_code: "05", state_abbr: "CA", state_name: "California"}
+          - {state_code: "45", state_abbr: "TX", state_name: "Texas"}
+    expect:
+      rows:
+        - {desynpuf_id: "NONE_ALIVE", chronic_condition_count: 0, is_deceased: false,
+           state_abbr: "CA", state_name: "California"}
+        - {desynpuf_id: "THREE_DECEASED", chronic_condition_count: 3, is_deceased: true,
+           state_abbr: "TX", state_name: "Texas"}
+        - {desynpuf_id: "ALL_ELEVEN", chronic_condition_count: 11, is_deceased: false,
+           state_abbr: "CA", state_name: "California"}
